@@ -3,7 +3,7 @@ module Client where
 import Prelude
 
 import App.Message (Message(..))
-import App.Route (Route, routeCodec)
+import App.Route (routeCodec)
 import App.View (view)
 import Client.Update (mkUpdate)
 import Data.Either (hush)
@@ -12,7 +12,7 @@ import Effect (Effect)
 import Flame (AppId(..), resumeMount)
 import Flame.Subscription (send)
 import Routing.Duplex (parse)
-import Routing.PushState (makeInterface, matchesWith)
+import Routing.PushState (makeInterface, paths)
 import Web.DOM.ParentNode (QuerySelector(..))
 
 appId :: AppId String Message
@@ -25,7 +25,7 @@ main = do
   _model <- resumeMount (QuerySelector "main#app") appId
     { view, update: mkUpdate nav, subscribe: [] }
 
-  void $ matchesWith (hush <<< parse routeCodec) handleRoute nav
+  void $ paths handlePath nav
   where
-  handleRoute :: Maybe Route -> Route -> Effect Unit
-  handleRoute _old new = send appId (UrlChanged new)
+  handlePath :: Maybe String -> String -> Effect Unit
+  handlePath _old new = send appId (UrlChanged (hush $ parse routeCodec new))

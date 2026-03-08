@@ -3,14 +3,11 @@ module Server where
 import Prelude
 
 import App.Message (Message)
-import App.Model (Model, PageModel)
-import App.Model as PageModel
-import App.Route (Route, routeCodec)
-import App.Route as Route
+import App.Model (Model, pageForMaybeRoute)
+import App.Route (routeCodec)
 import App.View (view)
 import App.View.Layout as Layout
 import Data.Either (hush)
-import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Flame.Application.Internal.PreMount (injectState, tagSerializedState, idSerializedState, attributeSerializedState, onlyLetters)
 import Flame.Html.Attribute as HA
@@ -27,19 +24,13 @@ renderPage :: String -> Effect String
 renderPage urlPath = do
   let
     mRoute = hush $ parse routeCodec urlPath
-    page = pageForRoute mRoute
+    page = pageForMaybeRoute mRoute
     model = { route: mRoute, page, isHydrated: false }
     appView = view model
     stateEl = mkStateElement model
     withState = injectState stateEl appView
     fullDoc = Layout.document withState
   FRS.render fullDoc
-
-pageForRoute :: Maybe Route -> PageModel
-pageForRoute = case _ of
-  Just Route.Home -> PageModel.Home
-  Just Route.About -> PageModel.About
-  Nothing -> PageModel.NotFound
 
 mkStateElement :: Model -> Html Message
 mkStateElement model =

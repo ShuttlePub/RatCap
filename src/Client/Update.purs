@@ -3,10 +3,8 @@ module Client.Update where
 import Prelude
 
 import App.Message (Message(..))
-import App.Model (Model, PageModel)
-import App.Model as PageModel
-import App.Route (Route, routeCodec)
-import App.Route as Route
+import App.Model (Model, pageForMaybeRoute)
+import App.Route (routeCodec)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
@@ -22,15 +20,10 @@ mkUpdate nav model = case _ of
     in Tuple model
       [ liftEffect (nav.pushState (unsafeToForeign {}) url) $> Nothing ]
 
-  UrlChanged route ->
+  UrlChanged mRoute ->
     if not model.isHydrated
       then noMessages $ model { isHydrated = true }
-      else noMessages $ model { route = Just route, page = pageForRoute route }
+      else noMessages $ model { route = mRoute, page = pageForMaybeRoute mRoute }
 
   PageLoaded page ->
     noMessages $ model { page = page }
-
-pageForRoute :: Route -> PageModel
-pageForRoute = case _ of
-  Route.Home -> PageModel.Home
-  Route.About -> PageModel.About
