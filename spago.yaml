@@ -1,0 +1,14 @@
+package:
+  name: ratcap
+  dependencies:
+    - console
+    - effect
+    - flame
+    - prelude
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 73.3.0
+  extraPackages: {}
