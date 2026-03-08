@@ -1,10 +1,22 @@
 package:
   name: ratcap
   dependencies:
+    - aff
+    - argonaut-codecs
+    - argonaut-core
+    - argonaut-generic
     - console
     - effect
+    - either
     - flame
+    - foldable-traversable
+    - foreign
+    - maybe
     - prelude
+    - routing
+    - routing-duplex
+    - tuples
+    - web-events
   test:
     main: Test.Main
     dependencies: []
