@@ -5,10 +5,12 @@ import Prelude
 import App.Message (Message)
 import App.Model (Model, pageForMaybeRoute)
 import App.Route (routeCodec)
+import Data.Maybe (Maybe(..))
 import App.View (view)
 import App.View.Layout as Layout
 import Data.Either (hush)
 import Effect (Effect)
+import Server.Api as Api
 import Flame.Application.Internal.PreMount (injectState, tagSerializedState, idSerializedState, attributeSerializedState, onlyLetters)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
@@ -25,7 +27,7 @@ renderPage urlPath = do
   let
     mRoute = hush $ parse routeCodec urlPath
     page = pageForMaybeRoute mRoute
-    model = { route: mRoute, page, isHydrated: false }
+    model = { route: mRoute, page, isHydrated: false, weather: Nothing }
     appView = view model
     stateEl = mkStateElement model
     withState = injectState stateEl appView
@@ -42,3 +44,6 @@ mkStateElement model =
     [ HE.text $ FS.serialize model ]
   where
   sanitizedSelector = onlyLetters selector
+
+transformWeather :: String -> String
+transformWeather = Api.transformWeather

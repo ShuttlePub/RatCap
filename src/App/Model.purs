@@ -2,6 +2,7 @@ module App.Model where
 
 import Prelude
 
+import App.Api.Weather (WeatherDay)
 import App.Route (Route)
 import App.Route as Route
 import Data.Argonaut.Decode (class DecodeJson)
@@ -26,6 +27,7 @@ type Model =
   { route :: Maybe Route
   , page :: PageModel
   , isHydrated :: Boolean
+  , weather :: Maybe (Array WeatherDay)
   }
 
 pageForRoute :: Route -> PageModel

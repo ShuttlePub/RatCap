@@ -25,6 +25,8 @@ main = do
   _model <- resumeMount (QuerySelector "main#app") appId
     { view, update: mkUpdate nav, subscribe: [] }
 
+  send appId FetchWeather
+
   void $ paths handlePath nav
   where
   handlePath :: Maybe String -> String -> Effect Unit

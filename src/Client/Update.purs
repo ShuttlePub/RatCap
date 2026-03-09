@@ -2,9 +2,14 @@ module Client.Update where
 
 import Prelude
 
+import App.Api.Weather (WeatherResponse(..))
 import App.Message (Message(..))
 import App.Model (Model, pageForMaybeRoute)
 import App.Route (routeCodec)
+import Client.Fetch (fetchText)
+import Data.Argonaut.Decode (decodeJson)
+import Data.Argonaut.Parser (jsonParser)
+import Data.Either (hush)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
@@ -27,3 +32,17 @@ mkUpdate nav model = case _ of
 
   PageLoaded page ->
     noMessages $ model { page = page }
+
+  FetchWeather ->
+    Tuple model
+      [ do
+          body <- fetchText "/api/weather"
+          let mForecasts = do
+                json <- hush $ jsonParser body
+                WeatherResponse { forecasts } <- hush $ decodeJson json
+                pure forecasts
+          pure $ WeatherLoaded <$> mForecasts
+      ]
+
+  WeatherLoaded forecasts ->
+    noMessages $ model { weather = Just forecasts }

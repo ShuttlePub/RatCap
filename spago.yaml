@@ -2,6 +2,7 @@ package:
   name: ratcap
   dependencies:
     - aff
+    - arrays
     - argonaut-codecs
     - argonaut-core
     - argonaut-generic

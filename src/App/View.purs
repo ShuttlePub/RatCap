@@ -11,7 +11,7 @@ import Flame (Html)
 view :: Model -> Html Message
 view model = Layout.page model
   [ case model.page of
-      Home -> Home.view
+      Home -> Home.view model.weather
       About -> About.view
       NotFound -> NotFound.view
   ]
