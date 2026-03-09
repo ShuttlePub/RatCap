@@ -22,6 +22,6 @@ watchexec -w src -w spago.yaml -e purs -- \
 bunx @tailwindcss/cli -i src/style.css -o dist/style.css --watch &
 
 # Start Bun dev server
-bun scripts/serve.ts &
+bun index.ts &
 
 wait
