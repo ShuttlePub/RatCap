@@ -1,4 +1,4 @@
-import { renderPage, transformWeather } from "../dist/server.js";
+import { renderPage, transformWeather } from "./dist/server.js";
 
 // 7timer API - Tokyo (139.69E, 35.69N)
 const WEATHER_API =
