@@ -4,14 +4,15 @@ import Prelude
 
 import App.Api.Weather (WeatherResponse(..))
 import App.Message (Message(..))
-import App.Model (Model, pageForMaybeRoute)
+import App.Model (Model, RemoteData(..), pageForMaybeRoute)
 import App.Route (routeCodec)
 import Client.Fetch (fetchText)
 import Data.Argonaut.Decode (decodeJson)
 import Data.Argonaut.Parser (jsonParser)
-import Data.Either (hush)
+import Data.Either (Either(..), hush)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import Effect.Aff (try)
 import Effect.Class (liftEffect)
 import Flame (Update, noMessages)
 import Foreign (unsafeToForeign)
@@ -34,15 +35,23 @@ mkUpdate nav model = case _ of
     noMessages $ model { page = page }
 
   FetchWeather ->
-    Tuple model
+    Tuple (model { weather = Loading })
       [ do
-          body <- fetchText "/api/weather"
-          let mForecasts = do
-                json <- hush $ jsonParser body
-                WeatherResponse { forecasts } <- hush $ decodeJson json
-                pure forecasts
-          pure $ WeatherLoaded <$> mForecasts
+          result <- try $ fetchText "/api/weather"
+          pure $ Just $ case result of
+            Left _ -> WeatherFailed
+            Right body ->
+              let mForecasts = do
+                    json <- hush $ jsonParser body
+                    WeatherResponse { forecasts } <- hush $ decodeJson json
+                    pure forecasts
+              in case mForecasts of
+                Nothing -> WeatherFailed
+                Just fs -> WeatherLoaded fs
       ]
 
   WeatherLoaded forecasts ->
-    noMessages $ model { weather = Just forecasts }
+    noMessages $ model { weather = Loaded forecasts }
+
+  WeatherFailed ->
+    noMessages $ model { weather = Failed }

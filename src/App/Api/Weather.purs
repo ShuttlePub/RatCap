@@ -68,4 +68,4 @@ formatDate :: Int -> String
 formatDate d = show month <> "/" <> show day
   where
   day = d `mod` 100
-  month = (d `mod` 10000) / 100
+  month = (d `mod` 10000) `div` 100

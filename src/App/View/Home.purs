@@ -4,27 +4,32 @@ import Prelude
 
 import App.Api.Weather (WeatherDay(..), weatherLabel, weatherIcon, formatDate)
 import App.Message (Message)
-import Data.Maybe (Maybe(..))
+import App.Model (RemoteData(..))
 import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 
-view :: Maybe (Array WeatherDay) -> Html Message
-view mWeather =
+view :: RemoteData (Array WeatherDay) -> Html Message
+view weather =
   HE.div [HA.class' "space-y-8"]
     [ HE.h1 [HA.class' "text-4xl font-bold tracking-tight text-gray-900"]
         [ HE.text "Home" ]
     , HE.p [HA.class' "text-lg text-gray-600 leading-relaxed"]
         [ HE.text "Welcome to Ratcap." ]
-    , weatherSection mWeather
+    , weatherSection weather
     ]
 
-weatherSection :: Maybe (Array WeatherDay) -> Html Message
+weatherSection :: RemoteData (Array WeatherDay) -> Html Message
 weatherSection = case _ of
-  Nothing ->
+  NotAsked ->
+    HE.text ""
+  Loading ->
     HE.div [HA.class' "flex items-center gap-2 text-gray-400"]
       [ HE.text "Loading weather..." ]
-  Just days ->
+  Failed ->
+    HE.div [HA.class' "flex items-center gap-2 text-red-500"]
+      [ HE.text "Failed to load weather data." ]
+  Loaded days ->
     HE.div [HA.class' "space-y-3"]
       [ HE.h2 [HA.class' "text-xl font-semibold text-gray-800"]
           [ HE.text "Tokyo Weather Forecast" ]

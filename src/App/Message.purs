@@ -11,3 +11,4 @@ data Message
   | PageLoaded PageModel
   | FetchWeather
   | WeatherLoaded (Array WeatherDay)
+  | WeatherFailed

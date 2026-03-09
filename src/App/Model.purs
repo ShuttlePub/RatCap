@@ -23,11 +23,21 @@ instance EncodeJson PageModel where
 instance DecodeJson PageModel where
   decodeJson = genericDecodeJson
 
+data RemoteData a = NotAsked | Loading | Failed | Loaded a
+
+derive instance Generic (RemoteData a) _
+
+instance EncodeJson a => EncodeJson (RemoteData a) where
+  encodeJson = genericEncodeJson
+
+instance DecodeJson a => DecodeJson (RemoteData a) where
+  decodeJson = genericDecodeJson
+
 type Model =
   { route :: Maybe Route
   , page :: PageModel
   , isHydrated :: Boolean
-  , weather :: Maybe (Array WeatherDay)
+  , weather :: RemoteData (Array WeatherDay)
   }
 
 pageForRoute :: Route -> PageModel
