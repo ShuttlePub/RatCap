@@ -39,7 +39,7 @@ document content =
         , HE.title [ HE.text "Ratcap" ]
         , HE.link [ HA.rel "stylesheet", HA.href "/style.css" ]
         ]
-    , HE.body [HA.class' "bg-gray-50"]
+    , HE.body_
         [ content
         , HE.script [ HA.type' "module", HA.src "/app.js" ] []
         ]

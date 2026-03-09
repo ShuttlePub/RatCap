@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 cleanup() {
-  kill -- -$$ 2>/dev/null
+  kill $(jobs -p) 2>/dev/null
 }
 trap cleanup EXIT INT TERM
 
