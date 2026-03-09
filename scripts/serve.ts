@@ -9,6 +9,11 @@ Bun.serve({
         headers: { "Content-Type": "application/javascript" },
       });
 
+    if (url.pathname === "/style.css")
+      return new Response(Bun.file("dist/style.css"), {
+        headers: { "Content-Type": "text/css" },
+      });
+
     if (url.pathname.startsWith("/api/"))
       return new Response(JSON.stringify({ error: "not implemented" }), {
         status: 501,

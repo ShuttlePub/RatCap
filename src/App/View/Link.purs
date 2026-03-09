@@ -16,6 +16,7 @@ link :: Route -> Array (Html Message) -> Html Message
 link route children =
   HE.a
     [ HA.href (print routeCodec route)
+    , HA.class' "px-3 py-2 text-sm font-medium text-gray-600 rounded-lg transition-colors hover:text-gray-900 hover:bg-gray-100"
     , HA.createRawEvent "click" handler
     ]
     children
