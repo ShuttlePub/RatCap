@@ -10,6 +10,10 @@
     url = "github:thomashoneyman/purescript-overlay";
     inputs.nixpkgs.follows = "nixpkgs";
   };
+  inputs.treefmt-nix = {
+    url = "github:numtide/treefmt-nix";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   outputs =
     { nixpkgs, flake-utils, ... }@inputs:
@@ -20,9 +24,18 @@
           inherit system;
           overlays = [ inputs.purescript-overlay.overlays.default ];
         };
+        treefmtEval = inputs.treefmt-nix.lib.evalModule pkgs {
+          projectRootFile = "flake.nix";
+          programs.nixfmt.enable = true;
+          settings.formatter.purs-tidy = {
+            command = "${pkgs.purs-tidy}/bin/purs-tidy";
+            options = [ "format-in-place" ];
+            includes = [ "*.purs" ];
+          };
+        };
       in
       {
-        formatter = pkgs.nixfmt-tree;
+        formatter = treefmtEval.config.build.wrapper;
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
             bashInteractive
@@ -30,6 +43,7 @@
             spago
             purs-backend-es
             purescript-language-server
+            purs-tidy
             esbuild
             watchexec
           ];

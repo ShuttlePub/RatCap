@@ -22,14 +22,15 @@ import Routing.PushState (PushStateInterface)
 mkUpdate :: PushStateInterface -> Update Model Message
 mkUpdate nav model = case _ of
   Navigate route ->
-    let url = print routeCodec route
-    in Tuple model
-      [ liftEffect (nav.pushState (unsafeToForeign {}) url) $> Nothing ]
+    let
+      url = print routeCodec route
+    in
+      Tuple model
+        [ liftEffect (nav.pushState (unsafeToForeign {}) url) $> Nothing ]
 
   UrlChanged mRoute ->
-    if not model.isHydrated
-      then noMessages $ model { isHydrated = true }
-      else noMessages $ model { route = mRoute, page = pageForMaybeRoute mRoute }
+    if not model.isHydrated then noMessages $ model { isHydrated = true }
+    else noMessages $ model { route = mRoute, page = pageForMaybeRoute mRoute }
 
   PageLoaded page ->
     noMessages $ model { page = page }
@@ -41,13 +42,15 @@ mkUpdate nav model = case _ of
           pure $ Just $ case result of
             Left _ -> WeatherFailed
             Right body ->
-              let mForecasts = do
-                    json <- hush $ jsonParser body
-                    WeatherResponse { forecasts } <- hush $ decodeJson json
-                    pure forecasts
-              in case mForecasts of
-                Nothing -> WeatherFailed
-                Just fs -> WeatherLoaded fs
+              let
+                mForecasts = do
+                  json <- hush $ jsonParser body
+                  WeatherResponse { forecasts } <- hush $ decodeJson json
+                  pure forecasts
+              in
+                case mForecasts of
+                  Nothing -> WeatherFailed
+                  Just fs -> WeatherLoaded fs
       ]
 
   WeatherLoaded forecasts ->
