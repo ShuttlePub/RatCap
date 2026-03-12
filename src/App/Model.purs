@@ -12,7 +12,7 @@ import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe, maybe)
 
-data PageModel = Home | About | NotFound
+data PageModel = Home | About | Settings | NotFound
 
 derive instance Generic PageModel _
 derive instance Eq PageModel
@@ -44,6 +44,7 @@ pageForRoute :: Route -> PageModel
 pageForRoute = case _ of
   Route.Home -> Home
   Route.About -> About
+  Route.Settings -> Settings
 
 pageForMaybeRoute :: Maybe Route -> PageModel
 pageForMaybeRoute = maybe NotFound pageForRoute

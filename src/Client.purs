@@ -18,6 +18,8 @@ import Web.DOM.ParentNode (QuerySelector(..))
 appId :: AppId String Message
 appId = AppId "ratcap"
 
+foreign import initThemeSelector :: Effect Unit
+
 main :: Effect Unit
 main = do
   nav <- makeInterface
@@ -26,6 +28,7 @@ main = do
     { view, update: mkUpdate nav, subscribe: [] }
 
   send appId FetchWeather
+  initThemeSelector
 
   void $ paths handlePath nav
   where

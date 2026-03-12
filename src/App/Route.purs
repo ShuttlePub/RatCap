@@ -10,7 +10,7 @@ import Data.Generic.Rep (class Generic)
 import Routing.Duplex (RouteDuplex', root, prefix)
 import Routing.Duplex.Generic (noArgs, sum)
 
-data Route = Home | About
+data Route = Home | About | Settings
 
 derive instance Generic Route _
 derive instance Eq Route
@@ -25,4 +25,5 @@ routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
   , "About": prefix "about" noArgs
+  , "Settings": prefix "settings" noArgs
   }
