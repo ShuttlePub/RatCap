@@ -37,8 +37,8 @@ document :: Html Message -> Html Message
 document content =
   HE.html
     [ HA.lang "en"
-     , HA.createAttribute "data-color" "purple"
-     , HA.createAttribute "data-shape" "rounded"
+    , HA.createAttribute "data-color" "catppuccin-mocha"
+    , HA.createAttribute "data-shape" "rounded"
     ]
     [ HE.head_
         [ HE.meta [ HA.charset "utf-8" ]
@@ -56,4 +56,4 @@ document content =
 themeInitScript :: Html Message
 themeInitScript =
   HE.script_
-    [ HE.text "(function(){var d=document.documentElement,c=localStorage.getItem('ratcap-color')||'purple',s=localStorage.getItem('ratcap-shape')||'rounded';d.setAttribute('data-color',c);d.setAttribute('data-shape',s);var bg={purple:'#241434',navy:'#1a2540'};d.style.backgroundColor=bg[c]||bg.purple;})()" ]
+    [ HE.text "(function(){var d=document.documentElement,c=localStorage.getItem('ratcap-color')||'catppuccin-mocha',s=localStorage.getItem('ratcap-shape')||'rounded';d.setAttribute('data-color',c);d.setAttribute('data-shape',s);var bg={'catppuccin-mocha':'#1e1e2e','tokyo-night':'#1a1b26'};d.style.backgroundColor=bg[c]||bg['catppuccin-mocha'];})()" ]

@@ -23,8 +23,8 @@ colorSection =
     [ HE.h2 [ HA.class' ("text-xl font-semibold " <> T.textPrimary) ]
         [ HE.text "Color" ]
     , HE.div [ HA.class' "flex gap-3" ]
-        [ colorCard "purple" "#a78bfa" "Purple"
-        , colorCard "navy" "#4488cc" "Navy"
+        [ colorCard "catppuccin-mocha" "#cba6f7" "Catppuccin Mocha"
+        , colorCard "tokyo-night" "#7aa2f7" "Tokyo Night"
         ]
     ]
 
