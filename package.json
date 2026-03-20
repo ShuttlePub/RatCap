@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@types/bun": "latest",
     "@tailwindcss/cli": "^4.2.1",
     "spago": "^1.0.3",

@@ -16,6 +16,7 @@
             "flame",
             "foldable-traversable",
             "foreign",
+            "foreign-object",
             "maybe",
             "prelude",
             "routing",
