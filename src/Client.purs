@@ -3,11 +3,11 @@ module Client where
 import Prelude
 
 import App.Message (Message(..))
-import App.Route (routeCodec)
+import App.Route (Route(..), routeCodec)
 import App.View (view)
 import Client.Update (mkUpdate)
 import Data.Either (hush)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Flame (AppId(..), resumeMount)
 import Flame.Subscription (send)
@@ -27,8 +27,15 @@ main = do
   _model <- resumeMount (QuerySelector "main#app") appId
     { view, update: mkUpdate nav, subscribe: [] }
 
-  send appId FetchWeather
   initThemeSelector
+
+  -- Initial route-based data fetching
+  loc <- nav.locationState
+  let currentRoute = hush $ parse routeCodec loc.path
+  case currentRoute of
+    Just Home -> send appId FetchAccounts
+    Just (AccountDetail id) -> send appId (FetchAccountDetail id)
+    _ -> pure unit
 
   void $ paths handlePath nav
   where

@@ -26,7 +26,6 @@ nav =
             [ HE.span [ HA.class' ("text-lg font-bold tracking-tight " <> T.textHeading) ] [ HE.text "Ratcap" ]
             , HE.ul [ HA.class' "flex items-center gap-1" ]
                 [ HE.li_ [ link Home [ HE.text "Home" ] ]
-                , HE.li_ [ link About [ HE.text "About" ] ]
                 , HE.li_ [ link Settings [ HE.text "Settings" ] ]
                 ]
             ]
