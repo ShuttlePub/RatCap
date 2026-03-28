@@ -10,7 +10,7 @@ import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 
 data PageModel = Home | Settings | AccountNew | AccountDetail | NotFound
 
@@ -39,12 +39,42 @@ type AccountWithDetails =
   , metadata :: Array MetadataResponse
   }
 
+-- Form state for creating a new account
+type NewAccountForm =
+  { name :: String
+  , isBot :: Boolean
+  }
+
+emptyNewAccountForm :: NewAccountForm
+emptyNewAccountForm = { name: "", isBot: false }
+
+-- Form state for editing a profile (Nothing = not editing)
+type EditProfileForm =
+  { displayName :: String
+  , summary :: String
+  , iconUrl :: String
+  , bannerUrl :: String
+  }
+
+-- Form state for adding/editing metadata (Nothing = not editing)
+-- id: Nothing = creating new, Just nanoid = editing existing
+type EditMetadataForm =
+  { id :: Maybe String
+  , label :: String
+  , content :: String
+  }
+
 type Model =
   { route :: Maybe Route
   , page :: PageModel
   , isHydrated :: Boolean
   , accounts :: RemoteData (Array AccountResponse)
   , selectedAccount :: RemoteData AccountWithDetails
+  , accountDetails :: Array AccountWithDetails
+  , nextId :: Int
+  , newAccountForm :: NewAccountForm
+  , editProfileForm :: Maybe EditProfileForm
+  , editMetadataForm :: Maybe EditMetadataForm
   }
 
 pageForRoute :: Route -> PageModel

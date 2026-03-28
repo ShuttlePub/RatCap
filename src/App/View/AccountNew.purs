@@ -2,28 +2,32 @@ module App.View.AccountNew where
 
 import Prelude
 
-import App.Message (Message)
+import App.Message (Message(..))
+import App.Model (NewAccountForm)
 import App.Theme as T
+import Data.String.Common (trim)
 import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 
-view :: Html Message
-view =
+view :: NewAccountForm -> Html Message
+view form =
   HE.div [ HA.class' "space-y-8 max-w-lg mx-auto" ]
     [ HE.h1 [ HA.class' ("text-4xl font-bold tracking-tight " <> T.textHeading) ]
         [ HE.text "New Account" ]
-    , formSection
+    , formSection form
     ]
 
-formSection :: Html Message
-formSection =
+formSection :: NewAccountForm -> Html Message
+formSection form =
   HE.div [ HA.class' (T.surface <> " p-6 space-y-5") ]
     [ fieldGroup "Name" "Account handle (e.g. alice)"
         [ HE.input
             [ HA.class' (inputClass <> " w-full")
             , HA.type' "text"
             , HA.placeholder "alice"
+            , HA.value form.name
+            , HA.onInput SetNewAccountName
             ]
         ]
     , fieldGroup "Type" "Is this a bot account?"
@@ -31,6 +35,8 @@ formSection =
             [ HE.input
                 [ HA.class' ("w-4 h-4 " <> T.bgAccent)
                 , HA.type' "checkbox"
+                , HA.checked form.isBot
+                , HA.onCheck SetNewAccountIsBot
                 ]
             , HE.text "This is a bot account"
             ]
@@ -38,6 +44,8 @@ formSection =
     , HE.div [ HA.class' "pt-2" ]
         [ HE.button
             [ HA.class' ("w-full px-4 py-2.5 text-sm font-medium text-white " <> T.bgAccent <> " " <> T.hoverBgAccent <> " " <> T.roundedTheme <> " transition-colors")
+            , HA.onClick SubmitNewAccount
+            , HA.disabled (trim form.name == "")
             ]
             [ HE.text "Create Account" ]
         ]

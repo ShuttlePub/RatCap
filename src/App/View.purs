@@ -15,7 +15,7 @@ view model = Layout.page model
   [ case model.page of
       Home -> Accounts.view model.accounts
       Settings -> Settings.view
-      AccountNew -> AccountNew.view
-      AccountDetail -> AccountDetail.view model.selectedAccount
+      AccountNew -> AccountNew.view model.newAccountForm
+      AccountDetail -> AccountDetail.view model.selectedAccount model.editProfileForm model.editMetadataForm
       NotFound -> NotFound.view
   ]

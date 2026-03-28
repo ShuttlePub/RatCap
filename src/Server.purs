@@ -3,11 +3,13 @@ module Server where
 import Prelude
 
 import App.Message (Message)
+import App.Mock (mockAccountDetails)
 import App.Model (Model, RemoteData(..), pageForMaybeRoute)
 import App.Route (routeCodec)
 import App.View (view)
 import App.View.Layout as Layout
 import Data.Either (hush)
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Flame.Application.Internal.PreMount (injectState, tagSerializedState, idSerializedState, attributeSerializedState, onlyLetters)
 import Flame.Html.Attribute as HA
@@ -25,7 +27,7 @@ renderPage urlPath = do
   let
     mRoute = hush $ parse routeCodec urlPath
     page = pageForMaybeRoute mRoute
-    model = { route: mRoute, page, isHydrated: false, accounts: NotAsked, selectedAccount: NotAsked }
+    model = { route: mRoute, page, isHydrated: false, accounts: NotAsked, selectedAccount: NotAsked, accountDetails: mockAccountDetails, nextId: 100, newAccountForm: { name: "", isBot: false }, editProfileForm: Nothing, editMetadataForm: Nothing }
     appView = view model
     stateEl = mkStateElement model
     withState = injectState stateEl appView
