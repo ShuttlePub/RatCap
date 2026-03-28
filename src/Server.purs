@@ -3,7 +3,6 @@ module Server where
 import Prelude
 
 import App.Message (Message)
-import App.Mock (mockAccountDetails)
 import App.Model (Model, RemoteData(..), pageForMaybeRoute)
 import App.Route (routeCodec)
 import App.View (view)
@@ -27,7 +26,7 @@ renderPage urlPath = do
   let
     mRoute = hush $ parse routeCodec urlPath
     page = pageForMaybeRoute mRoute
-    model = { route: mRoute, page, isHydrated: false, accounts: NotAsked, selectedAccount: NotAsked, accountDetails: mockAccountDetails, nextId: 100, newAccountForm: { name: "", isBot: false }, editProfileForm: Nothing, editMetadataForm: Nothing }
+    model = { route: mRoute, page, isHydrated: false, accounts: NotAsked, selectedAccount: NotAsked, newAccountForm: { name: "", isBot: false }, editProfileForm: Nothing, editMetadataForm: Nothing, errorMessage: Nothing, savePending: false }
     appView = view model
     stateEl = mkStateElement model
     withState = injectState stateEl appView

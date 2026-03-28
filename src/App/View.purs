@@ -13,9 +13,9 @@ import Flame (Html)
 view :: Model -> Html Message
 view model = Layout.page model
   [ case model.page of
-      Home -> Accounts.view model.accounts
+      Home -> Accounts.view model.accounts model.errorMessage
       Settings -> Settings.view
-      AccountNew -> AccountNew.view model.newAccountForm
-      AccountDetail -> AccountDetail.view model.selectedAccount model.editProfileForm model.editMetadataForm
+      AccountNew -> AccountNew.view model.newAccountForm model.errorMessage model.savePending
+      AccountDetail -> AccountDetail.view model.selectedAccount model.editProfileForm model.editMetadataForm model.errorMessage model.savePending
       NotFound -> NotFound.view
   ]

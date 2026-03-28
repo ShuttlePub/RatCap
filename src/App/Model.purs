@@ -70,11 +70,11 @@ type Model =
   , isHydrated :: Boolean
   , accounts :: RemoteData (Array AccountResponse)
   , selectedAccount :: RemoteData AccountWithDetails
-  , accountDetails :: Array AccountWithDetails
-  , nextId :: Int
   , newAccountForm :: NewAccountForm
   , editProfileForm :: Maybe EditProfileForm
   , editMetadataForm :: Maybe EditMetadataForm
+  , errorMessage :: Maybe String
+  , savePending :: Boolean
   }
 
 pageForRoute :: Route -> PageModel

@@ -9,18 +9,27 @@ import App.Route as Route
 import App.Theme as T
 import App.View.Link as Link
 import App.Format (formatDate)
+import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (take)
 import Data.String.Common (toUpper)
 import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 
-view :: RemoteData (Array AccountResponse) -> Html Message
-view accounts =
+view :: RemoteData (Array AccountResponse) -> Maybe String -> Html Message
+view accounts errorMsg =
   HE.div [ HA.class' "space-y-8" ]
     [ header
+    , errorBanner errorMsg
     , accountsSection accounts
     ]
+
+errorBanner :: Maybe String -> Html Message
+errorBanner = case _ of
+  Nothing -> HE.text ""
+  Just msg ->
+    HE.div [ HA.class' ("px-4 py-3 text-sm " <> T.roundedTheme <> " " <> T.textError <> " border " <> T.borderTheme <> " bg-red-500/10") ]
+      [ HE.text msg ]
 
 header :: Html Message
 header =

@@ -2,10 +2,13 @@ package:
   name: ratcap
   dependencies:
     - aff
+    - affjax
+    - affjax-web
     - argonaut-codecs
     - argonaut-core
     - argonaut-generic
     - arrays
+    - bifunctors
     - console
     - effect
     - either
@@ -13,10 +16,13 @@ package:
     - foldable-traversable
     - foreign
     - foreign-object
+    - http-methods
     - maybe
+    - parallel
     - prelude
     - routing
     - routing-duplex
+    - strings
     - tuples
     - web-events
   test:

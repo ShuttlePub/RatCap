@@ -6,10 +6,13 @@
         "core": {
           "dependencies": [
             "aff",
+            "affjax",
+            "affjax-web",
             "argonaut-codecs",
             "argonaut-core",
             "argonaut-generic",
             "arrays",
+            "bifunctors",
             "console",
             "effect",
             "either",
@@ -17,10 +20,13 @@
             "foldable-traversable",
             "foreign",
             "foreign-object",
+            "http-methods",
             "maybe",
+            "parallel",
             "prelude",
             "routing",
             "routing-duplex",
+            "strings",
             "tuples",
             "web-events"
           ]
@@ -646,6 +652,48 @@
         "unsafe-coerce"
       ]
     },
+    "affjax": {
+      "type": "registry",
+      "version": "13.0.0",
+      "integrity": "sha256-dpOV8ELNqUVBwxE6eKFdnFky+sLwPFANrFUzIxQablk=",
+      "dependencies": [
+        "aff",
+        "argonaut-core",
+        "arraybuffer-types",
+        "arrays",
+        "control",
+        "datetime",
+        "either",
+        "exceptions",
+        "foldable-traversable",
+        "foreign",
+        "form-urlencoded",
+        "functions",
+        "http-methods",
+        "lists",
+        "maybe",
+        "media-types",
+        "newtype",
+        "nullable",
+        "prelude",
+        "transformers",
+        "web-dom",
+        "web-file",
+        "web-xhr"
+      ]
+    },
+    "affjax-web": {
+      "type": "registry",
+      "version": "1.0.0",
+      "integrity": "sha256-sHg+G50LDoZYG6UHvUiH1ZLT/UHIXaEF5DUBaPXxtxM=",
+      "dependencies": [
+        "aff",
+        "affjax",
+        "either",
+        "maybe",
+        "prelude"
+      ]
+    },
     "argonaut-codecs": {
       "type": "registry",
       "version": "9.1.0",
@@ -702,6 +750,12 @@
         "partial",
         "prelude"
       ]
+    },
+    "arraybuffer-types": {
+      "type": "registry",
+      "version": "3.0.2",
+      "integrity": "sha256-p05cJnSkyeoB7VHzMyc2Eb1RwUaB7Nl0sQSqEGNEUD8=",
+      "dependencies": []
     },
     "arrays": {
       "type": "registry",
@@ -951,6 +1005,20 @@
         "unsafe-coerce"
       ]
     },
+    "form-urlencoded": {
+      "type": "registry",
+      "version": "7.0.0",
+      "integrity": "sha256-+8F0S6thSLsC1GfQiTdTt6jyTMuhsgKLciBUzde9aFU=",
+      "dependencies": [
+        "foldable-traversable",
+        "js-uri",
+        "maybe",
+        "newtype",
+        "prelude",
+        "strings",
+        "tuples"
+      ]
+    },
     "functions": {
       "type": "registry",
       "version": "6.0.0",
@@ -994,6 +1062,16 @@
         "tailrec",
         "tuples",
         "unfoldable"
+      ]
+    },
+    "http-methods": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-S0UjrJSgwJxEsFHM/pX77dM8V4HfvvDqdHPckQrtxMs=",
+      "dependencies": [
+        "either",
+        "prelude",
+        "strings"
       ]
     },
     "identity": {
@@ -1522,6 +1600,30 @@
         "prelude",
         "unsafe-coerce",
         "web-events"
+      ]
+    },
+    "web-xhr": {
+      "type": "registry",
+      "version": "5.0.1",
+      "integrity": "sha256-gxQgeGwvF/NyGdw0FJ9IzXI3gqIMNb8oQO8X+p5jDyw=",
+      "dependencies": [
+        "arraybuffer-types",
+        "datetime",
+        "effect",
+        "either",
+        "enums",
+        "foreign",
+        "http-methods",
+        "maybe",
+        "media-types",
+        "newtype",
+        "nullable",
+        "prelude",
+        "unsafe-coerce",
+        "web-dom",
+        "web-events",
+        "web-file",
+        "web-html"
       ]
     }
   }

@@ -15,8 +15,8 @@ import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 
-view :: RemoteData AccountWithDetails -> Maybe EditProfileForm -> Maybe EditMetadataForm -> Html Message
-view detail editProfile editMetadata =
+view :: RemoteData AccountWithDetails -> Maybe EditProfileForm -> Maybe EditMetadataForm -> Maybe String -> Boolean -> Html Message
+view detail editProfile editMetadata errorMsg savePending =
   case detail of
     NotAsked ->
       HE.text ""
@@ -24,25 +24,36 @@ view detail editProfile editMetadata =
       HE.div [ HA.class' ("flex items-center justify-center py-16 " <> T.textMuted) ]
         [ HE.text "Loading account..." ]
     Failed ->
-      HE.div [ HA.class' ("flex items-center justify-center py-16 " <> T.textError) ]
-        [ HE.text "Failed to load account." ]
+      HE.div [ HA.class' "space-y-4 py-8 px-4" ]
+        [ HE.div [ HA.class' ("flex items-center justify-center py-8 " <> T.textError) ]
+            [ HE.text "Failed to load account." ]
+        , errorBanner errorMsg
+        ]
     Loaded d ->
-      detailView d editProfile editMetadata
+      detailView d editProfile editMetadata errorMsg savePending
 
-detailView :: AccountWithDetails -> Maybe EditProfileForm -> Maybe EditMetadataForm -> Html Message
-detailView d editProfile editMetadata =
+detailView :: AccountWithDetails -> Maybe EditProfileForm -> Maybe EditMetadataForm -> Maybe String -> Boolean -> Html Message
+detailView d editProfile editMetadata errorMsg savePending =
   let
     AccountResponse acc = d.account
   in
     HE.div [ HA.class' "space-y-6" ]
       [ bannerSection d.profile
       , profileHeader acc d.profile
+      , errorBanner errorMsg
       , case editProfile of
-          Just form -> editProfileSection form
+          Just form -> editProfileSection form savePending
           Nothing -> profileSection d.profile
-      , metadataSection d.metadata editMetadata
+      , metadataSection d.metadata editMetadata savePending
       , accountInfoSection acc
       ]
+
+errorBanner :: Maybe String -> Html Message
+errorBanner = case _ of
+  Nothing -> HE.text ""
+  Just msg ->
+    HE.div [ HA.class' ("px-4 py-3 text-sm " <> T.roundedTheme <> " " <> T.textError <> " border " <> T.borderTheme <> " bg-red-500/10") ]
+      [ HE.text msg ]
 
 -- Banner (full-width image or gradient fallback)
 bannerSection :: Maybe ProfileResponse -> Html Message
@@ -131,8 +142,8 @@ profileRow label value =
     ]
 
 -- Profile edit form (inline)
-editProfileSection :: EditProfileForm -> Html Message
-editProfileSection form =
+editProfileSection :: EditProfileForm -> Boolean -> Html Message
+editProfileSection form savePending =
   HE.div [ HA.class' (T.surface <> " p-5") ]
     [ HE.div [ HA.class' "flex items-center justify-between mb-4" ]
         [ HE.h2 [ HA.class' ("text-lg font-semibold " <> T.textHeading) ]
@@ -141,13 +152,15 @@ editProfileSection form =
             [ HE.button
                 [ HA.class' ("px-3 py-1 text-xs font-medium " <> T.textMuted <> " border " <> T.borderTheme <> " " <> T.roundedTheme <> " hover:opacity-80 transition-opacity")
                 , HA.onClick CancelEditProfile
+                , HA.disabled savePending
                 ]
                 [ HE.text "Cancel" ]
             , HE.button
-                [ HA.class' ("px-3 py-1 text-xs font-medium text-white " <> T.bgAccent <> " " <> T.hoverBgAccent <> " " <> T.roundedTheme <> " transition-colors")
+                [ HA.class' ("px-3 py-1 text-xs font-medium text-white " <> T.bgAccent <> " " <> T.hoverBgAccent <> " " <> T.roundedTheme <> " transition-colors" <> if savePending then " opacity-50 cursor-not-allowed" else "")
                 , HA.onClick SaveProfile
+                , HA.disabled savePending
                 ]
-                [ HE.text "Save" ]
+                [ HE.text (if savePending then "Saving..." else "Save") ]
             ]
         ]
     , HE.div [ HA.class' "space-y-3" ]
@@ -185,8 +198,8 @@ editTextarea label value handler =
     ]
 
 -- Metadata key-value pairs with CRUD
-metadataSection :: Array MetadataResponse -> Maybe EditMetadataForm -> Html Message
-metadataSection metadata editForm =
+metadataSection :: Array MetadataResponse -> Maybe EditMetadataForm -> Boolean -> Html Message
+metadataSection metadata editForm savePending =
   HE.div [ HA.class' (T.surface <> " p-5") ]
     [ HE.div [ HA.class' "flex items-center justify-between mb-3" ]
         [ HE.h2 [ HA.class' ("text-lg font-semibold " <> T.textHeading) ]
@@ -202,14 +215,14 @@ metadataSection metadata editForm =
         ]
     , if Array.null metadata && editForm == Nothing
         then HE.p [ HA.class' (T.textMuted <> " text-sm") ] [ HE.text "No metadata yet." ]
-        else HE.div [ HA.class' "space-y-2" ] (map (metadataRow editForm) metadata)
+        else HE.div [ HA.class' "space-y-2" ] (map (metadataRow editForm savePending) metadata)
     , case editForm of
-        Just form -> editMetadataSection form
+        Just form -> editMetadataSection form savePending
         Nothing -> HE.text ""
     ]
 
-metadataRow :: Maybe EditMetadataForm -> MetadataResponse -> Html Message
-metadataRow editForm (MetadataResponse m) =
+metadataRow :: Maybe EditMetadataForm -> Boolean -> MetadataResponse -> Html Message
+metadataRow editForm savePending (MetadataResponse m) =
   let
     isEditing = case editForm of
       Just f -> f.id == Just m.nanoid
@@ -225,21 +238,23 @@ metadataRow editForm (MetadataResponse m) =
               [ HE.text m.content ]
           , HE.div [ HA.class' "flex gap-1 shrink-0" ]
               [ HE.button
-                  [ HA.class' ("px-2 py-0.5 text-xs " <> T.textAccent <> " hover:opacity-80")
+                  [ HA.class' ("px-2 py-0.5 text-xs " <> T.textAccent <> " hover:opacity-80" <> if savePending then " opacity-50 cursor-not-allowed" else "")
                   , HA.onClick (StartEditMetadata m.nanoid)
+                  , HA.disabled savePending
                   ]
                   [ HE.text "Edit" ]
               , HE.button
-                  [ HA.class' ("px-2 py-0.5 text-xs " <> T.textError <> " hover:opacity-80")
+                  [ HA.class' ("px-2 py-0.5 text-xs " <> T.textError <> " hover:opacity-80" <> if savePending then " opacity-50 cursor-not-allowed" else "")
                   , HA.onClick (DeleteMetadata m.nanoid)
+                  , HA.disabled savePending
                   ]
                   [ HE.text "Delete" ]
               ]
           ]
 
 -- Metadata add/edit form (inline, shown below the list)
-editMetadataSection :: EditMetadataForm -> Html Message
-editMetadataSection form =
+editMetadataSection :: EditMetadataForm -> Boolean -> Html Message
+editMetadataSection form savePending =
   HE.div [ HA.class' ("mt-3 p-3 border " <> T.borderTheme <> " " <> T.roundedTheme <> " space-y-3") ]
     [ HE.div [ HA.class' "flex gap-3" ]
         [ HE.div [ HA.class' "flex-1 space-y-1" ]
@@ -269,14 +284,15 @@ editMetadataSection form =
         [ HE.button
             [ HA.class' ("px-3 py-1 text-xs font-medium " <> T.textMuted <> " border " <> T.borderTheme <> " " <> T.roundedTheme <> " hover:opacity-80 transition-opacity")
             , HA.onClick CancelMetadata
+            , HA.disabled savePending
             ]
             [ HE.text "Cancel" ]
         , HE.button
-            [ HA.class' ("px-3 py-1 text-xs font-medium text-white " <> T.bgAccent <> " " <> T.hoverBgAccent <> " " <> T.roundedTheme <> " transition-colors")
+            [ HA.class' ("px-3 py-1 text-xs font-medium text-white " <> T.bgAccent <> " " <> T.hoverBgAccent <> " " <> T.roundedTheme <> " transition-colors" <> if savePending then " opacity-50 cursor-not-allowed" else "")
             , HA.onClick SaveMetadata
-            , HA.disabled (trim form.label == "" || trim form.content == "")
+            , HA.disabled (trim form.label == "" || trim form.content == "" || savePending)
             ]
-            [ HE.text "Save" ]
+            [ HE.text (if savePending then "Saving..." else "Save") ]
         ]
     ]
 
