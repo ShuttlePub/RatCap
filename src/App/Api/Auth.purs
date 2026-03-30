@@ -12,25 +12,51 @@ import Data.Argonaut.Decode.Combinators ((.:))
 import Data.Either (Either)
 import Effect.Aff (Aff)
 
--- | Login request body
-newtype LoginRequest = LoginRequest { username :: String, password :: String }
+-- | Login request body (identifier = email for Kratos compatibility)
+newtype LoginRequest = LoginRequest { identifier :: String, password :: String }
 
 instance EncodeJson LoginRequest where
   encodeJson (LoginRequest r) =
-    "username" := r.username
+    "identifier" := r.identifier
       ~> "password" := r.password
       ~> jsonEmptyObject
 
--- | Login response from API
-newtype LoginResponse = LoginResponse { token :: String, username :: String }
+-- | Login response from BFF
+newtype LoginResponse = LoginResponse { authenticated :: Boolean, username :: String }
 
 instance DecodeJson LoginResponse where
   decodeJson json = do
     obj <- decodeJson json
-    token <- obj .: "token"
+    authenticated <- obj .: "authenticated"
     username <- obj .: "username"
-    pure (LoginResponse { token, username })
+    pure (LoginResponse { authenticated, username })
 
--- | POST /api/login
+-- | Session response from BFF (GET /auth/session)
+newtype SessionResponse = SessionResponse { authenticated :: Boolean, username :: String }
+
+instance DecodeJson SessionResponse where
+  decodeJson json = do
+    obj <- decodeJson json
+    authenticated <- obj .: "authenticated"
+    username <- obj .: "username"
+    pure (SessionResponse { authenticated, username })
+
+-- | POST /auth/login
 login :: LoginRequest -> Aff (Either ApiError LoginResponse)
-login = Api.post "/api/login"
+login = Api.post "/auth/login"
+
+-- | GET /auth/session
+checkSession :: Aff (Either ApiError SessionResponse)
+checkSession = Api.get "/auth/session"
+
+-- | POST /auth/logout
+logout :: Aff (Either ApiError LogoutResponse)
+logout = Api.post "/auth/logout" jsonEmptyObject
+
+newtype LogoutResponse = LogoutResponse { loggedOut :: Boolean }
+
+instance DecodeJson LogoutResponse where
+  decodeJson json = do
+    obj <- decodeJson json
+    loggedOut <- obj .: "loggedOut"
+    pure (LogoutResponse { loggedOut })

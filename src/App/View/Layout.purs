@@ -7,7 +7,7 @@ import App.Model (Model)
 import App.Route (Route(..))
 import App.Theme as T
 import App.View.Link (link)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..))
 import Flame (Html)
 import Flame.Html.Element as HE
 import Flame.Html.Attribute as HA
@@ -36,23 +36,19 @@ nav model =
 
 authSection :: Model -> Array (Html Message)
 authSection model =
-  if isJust model.authToken then
-    [ HE.li_ [ HE.span [ HA.class' ("px-3 py-2 text-sm " <> T.textMuted) ] [ HE.text (showUsername model.authUsername) ] ]
-    , HE.li_
-        [ HE.button
-            [ HA.class' ("px-3 py-2 text-sm font-medium " <> T.textSecondary <> " " <> T.roundedTheme <> " transition-colors " <> T.hoverTextAccent <> " hover:bg-bg-surface")
-            , HA.onClick Logout
-            ]
-            [ HE.text "Logout" ]
-        ]
-    ]
-  else
-    [ HE.li_ [ link Login [ HE.text "Login" ] ] ]
-
-showUsername :: Maybe String -> String
-showUsername = case _ of
-  Just u -> u
-  Nothing -> ""
+  case model.session of
+    Just session ->
+      [ HE.li_ [ HE.span [ HA.class' ("px-3 py-2 text-sm " <> T.textMuted) ] [ HE.text session.username ] ]
+      , HE.li_
+          [ HE.button
+              [ HA.class' ("px-3 py-2 text-sm font-medium " <> T.textSecondary <> " " <> T.roundedTheme <> " transition-colors " <> T.hoverTextAccent <> " hover:bg-bg-surface")
+              , HA.onClick Logout
+              ]
+              [ HE.text "Logout" ]
+          ]
+      ]
+    Nothing ->
+      [ HE.li_ [ link Login [ HE.text "Login" ] ] ]
 
 document :: Html Message -> Html Message
 document content =

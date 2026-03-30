@@ -4,7 +4,7 @@ import Prelude
 
 import App.Api.Client (ApiError(..), printApiError)
 import App.Api.Auth as Auth
-import App.Api.Auth (LoginRequest(..), LoginResponse(..))
+import App.Api.Auth (LoginRequest(..), LoginResponse(..), SessionResponse(..))
 import App.Api.Emumet.Client as Emumet
 import App.Api.Emumet.Tristate (Tristate(..))
 import App.Api.Emumet.Types (AccountResponse(..), CreateAccountRequest(..), CreateMetadataRequest(..), CreateProfileRequest(..), MetadataResponse(..), ProfileResponse(..), UpdateMetadataRequest(..), UpdateProfileRequest(..))
@@ -19,7 +19,6 @@ import Data.String.Common (trim)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
-import Client.Auth as SessionAuth
 import Flame (Update, noMessages)
 import Foreign (unsafeToForeign)
 import Routing.Duplex (print)
@@ -44,7 +43,7 @@ mkUpdate nav model = case _ of
       let
         -- Redirect to login if accessing protected route while unauthenticated
         needsAuth = case mRoute of
-          Just r -> isProtectedRoute r && isNothing model.authToken
+          Just r -> isProtectedRoute r && isNothing model.session
           Nothing -> false
         effectiveRoute = if needsAuth then Just Login else mRoute
         base = model { route = effectiveRoute, page = pageForMaybeRoute effectiveRoute, editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false }
@@ -62,7 +61,7 @@ mkUpdate nav model = case _ of
               noMessages $ base { newAccountForm = emptyNewAccountForm }
             Just Login ->
               -- Redirect authenticated user away from login page
-              if isJust model.authToken then
+              if isJust model.session then
                 let homeBase = model { route = Just Home, page = pageForMaybeRoute (Just Home), editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false, accounts = Loading }
                 in Tuple homeBase
                   [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
@@ -72,35 +71,61 @@ mkUpdate nav model = case _ of
                 noMessages $ base { loginForm = emptyLoginForm }
             _ -> noMessages base
 
-  -- Authentication
-  InitAuth mToken mUsername ->
+  -- Authentication (BFF-based)
+  CheckSession ->
+    Tuple model [ checkSessionAff ]
+
+  SessionLoaded sessionInfo ->
     let
-      m = model { authToken = mToken, authUsername = mUsername }
+      m = model { session = Just sessionInfo }
     in
       case m.route of
-        Just r | isProtectedRoute r && isNothing mToken ->
-          Tuple (m { route = Just Login, page = pageForMaybeRoute (Just Login) })
-            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
-        Just Home ->
-          Tuple (m { accounts = Loading }) [ pure $ Just FetchAccounts ]
-        Just (AccountDetail id) ->
-          Tuple (m { selectedAccount = Loading }) [ pure $ Just (FetchAccountDetail id) ]
-        Just AccountNew ->
-          noMessages $ m { newAccountForm = emptyNewAccountForm }
+        Just r | isProtectedRoute r ->
+          -- Authenticated, dispatch page-specific init
+          case m.route of
+            Just Home ->
+              Tuple (m { accounts = Loading }) [ pure $ Just FetchAccounts ]
+            Just (AccountDetail id) ->
+              Tuple (m { selectedAccount = Loading }) [ pure $ Just (FetchAccountDetail id) ]
+            Just AccountNew ->
+              noMessages $ m { newAccountForm = emptyNewAccountForm }
+            _ -> noMessages m
         Just Login ->
-          -- Redirect authenticated user away from login page
-          if isJust mToken then
-            let homeModel = m { route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
-            in Tuple homeModel
-              [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
-              , pure $ Just FetchAccounts
-              ]
-          else
-            noMessages $ m { loginForm = emptyLoginForm }
+          -- Authenticated user on login page → redirect to Home
+          let homeModel = m { route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
+          in Tuple homeModel
+            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
+            , pure $ Just FetchAccounts
+            ]
         _ -> noMessages m
 
-  SetLoginUsername username ->
-    noMessages $ model { loginForm = model.loginForm { username = username } }
+  SessionFailed ->
+    -- Ignore stale SessionFailed if we already have an active session
+    -- (e.g., startup CheckSession returns after successful LoginSuccess)
+    if isJust model.session then noMessages model
+    else
+    let
+      m = model { session = Nothing, savePending = false, editProfileForm = Nothing, editMetadataForm = Nothing }
+    in
+      case m.route of
+        Just r | isProtectedRoute r ->
+          Tuple (m { route = Just Login, page = pageForMaybeRoute (Just Login), loginForm = emptyLoginForm, errorMessage = Nothing })
+            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
+        _ -> noMessages m
+
+  SessionExpired ->
+    -- API returned 401 — force re-login regardless of local session state
+    let
+      m = model { session = Nothing, savePending = false, editProfileForm = Nothing, editMetadataForm = Nothing }
+    in
+      case m.route of
+        Just r | isProtectedRoute r ->
+          Tuple (m { route = Just Login, page = pageForMaybeRoute (Just Login), loginForm = emptyLoginForm, errorMessage = Nothing })
+            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
+        _ -> noMessages m
+
+  SetLoginIdentifier identifier ->
+    noMessages $ model { loginForm = model.loginForm { identifier = identifier } }
 
   SetLoginPassword password ->
     noMessages $ model { loginForm = model.loginForm { password = password } }
@@ -108,22 +133,21 @@ mkUpdate nav model = case _ of
   SubmitLogin ->
     let
       form = model.loginForm
-      trimmedUsername = trim form.username
+      trimmedIdentifier = trim form.identifier
     in
-      if trimmedUsername == "" || form.password == "" || model.savePending then noMessages model
+      if trimmedIdentifier == "" || form.password == "" || model.savePending then noMessages model
       else
         Tuple (model { errorMessage = Nothing, savePending = true })
-          [ submitLoginAff trimmedUsername form.password ]
+          [ submitLoginAff trimmedIdentifier form.password ]
 
-  LoginSuccess token username ->
+  LoginSuccess username ->
+    -- BFF has set the session cookie; update local state
     if model.route == Just Login
       then
-        Tuple (model { authToken = Just token, authUsername = Just username, loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false })
-          [ liftEffect do
-              SessionAuth.setToken token
-              SessionAuth.setUsername username
-              nav.pushState (unsafeToForeign {}) (print routeCodec Home)
-            $> Nothing
+        let homeModel = model { session = Just { username }, loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false, route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
+        in Tuple homeModel
+          [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
+          , pure $ Just FetchAccounts
           ]
       else noMessages $ model { savePending = false }
 
@@ -133,13 +157,14 @@ mkUpdate nav model = case _ of
       else noMessages $ model { savePending = false }
 
   Logout ->
-    Tuple (model { authToken = Nothing, authUsername = Nothing, loginForm = emptyLoginForm, route = Just Login, page = pageForMaybeRoute (Just Login) })
-      [ liftEffect do
-          SessionAuth.removeToken
-          SessionAuth.removeUsername
-          nav.replaceState (unsafeToForeign {}) (print routeCodec Login)
-        $> Nothing
-      ]
+    Tuple model [ logoutAff ]
+
+  LogoutDone ->
+    Tuple (model { session = Nothing, loginForm = emptyLoginForm, route = Just Login, page = pageForMaybeRoute (Just Login) })
+      [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
+
+  LogoutFailed msg ->
+    noMessages $ model { errorMessage = Just ("Logout failed: " <> msg) }
 
   -- Account list: fetch from API
   FetchAccounts ->
@@ -400,47 +425,69 @@ is404 :: ApiError -> Boolean
 is404 (HttpError 404 _) = true
 is404 _ = false
 
+-- | Check if an ApiError is a 401 (session expired / unauthorized)
+isUnauthorized :: ApiError -> Boolean
+isUnauthorized (HttpError 401 _) = true
+isUnauthorized _ = false
+
 -- Aff helpers: API calls that produce Messages
+
+checkSessionAff :: Aff (Maybe Message)
+checkSessionAff = do
+  result <- Auth.checkSession
+  pure $ Just $ case result of
+    Right (SessionResponse r) ->
+      if r.authenticated then SessionLoaded { username: r.username }
+      else SessionFailed
+    Left _ -> SessionFailed
 
 fetchAccountsAff :: Aff (Maybe Message)
 fetchAccountsAff = do
   result <- Emumet.fetchAccounts
   pure $ Just $ case result of
     Right accs -> AccountsLoaded accs
+    Left err | isUnauthorized err -> SessionExpired
     Left err -> AccountsFailed (printApiError err)
 
 fetchAccountDetailAff :: String -> Aff (Maybe Message)
 fetchAccountDetailAff id = do
   accResult <- Emumet.fetchAccount id
   case accResult of
+    Left err | isUnauthorized err -> pure $ Just SessionExpired
     Left err -> pure $ Just $ AccountDetailFailed id (printApiError err)
     Right acc -> do
       let AccountResponse a = acc
       -- Fetch profile and metadata in parallel
       Tuple profileResult metadataResult <- sequential $
         Tuple <$> parallel (Emumet.fetchProfile a.id) <*> parallel (Emumet.fetchMetadata a.id)
-      -- 404 = not yet created (normal), other errors = real failure
-      let
-        profileOutcome = case profileResult of
-          Right p -> Right (Just p)
-          Left err -> if is404 err then Right Nothing else Left err
-        metadataOutcome = case metadataResult of
-          Right ms -> Right ms
-          Left err -> if is404 err then Right [] else Left err
-      case profileOutcome, metadataOutcome of
-        Left err, _ -> pure $ Just $ AccountDetailFailed id ("Failed to load profile: " <> printApiError err)
-        _, Left err -> pure $ Just $ AccountDetailFailed id ("Failed to load metadata: " <> printApiError err)
-        Right profile, Right metadata ->
+      -- Check for 401 in parallel results first (session expired)
+      case profileResult, metadataResult of
+        Left err, _ | isUnauthorized err -> pure $ Just SessionExpired
+        _, Left err | isUnauthorized err -> pure $ Just SessionExpired
+        _, _ -> do
+          -- 404 = not yet created (normal), other errors = real failure
           let
-            detail :: AccountWithDetails
-            detail = { account: acc, profile, metadata }
-          in pure $ Just $ AccountDetailLoaded id detail
+            profileOutcome = case profileResult of
+              Right p -> Right (Just p)
+              Left err -> if is404 err then Right Nothing else Left err
+            metadataOutcome = case metadataResult of
+              Right ms -> Right ms
+              Left err -> if is404 err then Right [] else Left err
+          case profileOutcome, metadataOutcome of
+            Left err, _ -> pure $ Just $ AccountDetailFailed id ("Failed to load profile: " <> printApiError err)
+            _, Left err -> pure $ Just $ AccountDetailFailed id ("Failed to load metadata: " <> printApiError err)
+            Right profile, Right metadata ->
+              let
+                detail :: AccountWithDetails
+                detail = { account: acc, profile, metadata }
+              in pure $ Just $ AccountDetailLoaded id detail
 
 submitNewAccountAff :: String -> Boolean -> Aff (Maybe Message)
 submitNewAccountAff name isBot = do
   result <- Emumet.createAccount (CreateAccountRequest { name, isBot })
   pure $ Just $ case result of
     Right acc -> AccountCreated acc
+    Left err | isUnauthorized err -> SessionExpired
     Left err -> AccountCreateFailed (printApiError err)
 
 saveProfileAff :: String -> Boolean -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
@@ -451,6 +498,7 @@ saveProfileAff accountId hasExisting fields = do
       else Emumet.createProfile accountId (CreateProfileRequest fields)
   pure $ Just $ case result of
     Right profile -> ProfileSaved accountId profile
+    Left err | isUnauthorized err -> SessionExpired
     Left err -> ProfileSaveFailed accountId (printApiError err)
 
 saveMetadataAff :: String -> Maybe String -> { label :: String, content :: String } -> Aff (Maybe Message)
@@ -460,6 +508,7 @@ saveMetadataAff accountId mNanoid fields = do
     Nothing -> Emumet.createMetadata accountId (CreateMetadataRequest fields)
   pure $ Just $ case result of
     Right meta -> MetadataSaved accountId meta
+    Left err | isUnauthorized err -> SessionExpired
     Left err -> MetadataSaveFailed accountId (printApiError err)
 
 deleteMetadataAff :: String -> String -> Aff (Maybe Message)
@@ -467,18 +516,26 @@ deleteMetadataAff accountId nanoid = do
   result <- Emumet.deleteMetadata accountId nanoid
   pure $ Just $ case result of
     Right _ -> MetadataDeleted accountId nanoid
+    Left err | isUnauthorized err -> SessionExpired
     Left err -> MetadataDeleteFailed accountId (printApiError err)
 
 submitLoginAff :: String -> String -> Aff (Maybe Message)
-submitLoginAff username password = do
-  result <- Auth.login (LoginRequest { username, password })
+submitLoginAff identifier password = do
+  result <- Auth.login (LoginRequest { identifier, password })
   pure $ Just $ case result of
-    Right (LoginResponse r) -> LoginSuccess r.token r.username
+    Right (LoginResponse r) -> LoginSuccess r.username
     Left err -> LoginFailed (loginErrorMessage err)
+
+logoutAff :: Aff (Maybe Message)
+logoutAff = do
+  result <- Auth.logout
+  pure $ Just $ case result of
+    Right _ -> LogoutDone
+    Left err -> LogoutFailed (printApiError err)
 
 loginErrorMessage :: ApiError -> String
 loginErrorMessage = case _ of
-  HttpError 401 _ -> "Login failed: incorrect username or password"
+  HttpError 401 _ -> "Login failed: incorrect email or password"
   HttpError 403 _ -> "Login failed: access denied"
   HttpError 404 _ -> "Login failed: authentication service unavailable"
   NetworkError _ -> "Login failed: network error"

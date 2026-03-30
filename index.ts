@@ -4,6 +4,36 @@ import { renderPage } from "./dist/server.js";
 const USE_MOCK = process.env.USE_MOCK !== "false"; // default: mock mode
 const EMUMET_API_URL = process.env.EMUMET_API_URL || "http://localhost:8080";
 
+// --- Session cookie config ---
+const SESSION_COOKIE_NAME = "ratcap_session";
+// In mock mode, the cookie value is a plain JSON string (base64-encoded).
+// In real mode, it would be a JWE-encrypted token.
+function encodeSessionCookie(data: { token: string; username: string }): string {
+  return btoa(JSON.stringify(data));
+}
+function decodeSessionCookie(value: string): { token: string; username: string } | null {
+  try {
+    const parsed = JSON.parse(atob(value));
+    if (typeof parsed.token === "string" && typeof parsed.username === "string") return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+function setSessionCookie(headers: Headers, data: { token: string; username: string }): void {
+  headers.set("Set-Cookie", `${SESSION_COOKIE_NAME}=${encodeSessionCookie(data)}; Path=/; HttpOnly; SameSite=Lax`);
+}
+function clearSessionCookie(headers: Headers): void {
+  headers.set("Set-Cookie", `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
+function getSessionFromCookie(req: Request): { token: string; username: string } | null {
+  const cookieHeader = req.headers.get("cookie");
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`));
+  if (!match) return null;
+  return decodeSessionCookie(match[1]!);
+}
+
 // --- Static files ---
 const staticFiles: Record<string, { path: string; contentType: string }> = {
   "/app.js": { path: "dist/app.js", contentType: "application/javascript" },
@@ -67,32 +97,63 @@ const mockMetadata: MockMetadata[] = [
   { account_id: "acc_02", nanoid: "meta_03", label: "GitHub", content: "https://github.com/bob" },
 ];
 
-// --- Mock API handlers ---
-// Mock credentials (any username with password "password" succeeds)
+// --- Mock Auth handlers (BFF /auth/* endpoints) ---
 const MOCK_PASSWORD = "password";
 
-async function handleMockApi(req: Request, pathname: string): Promise<Response> {
+async function handleMockAuth(req: Request, pathname: string): Promise<Response | null> {
   const method = req.method;
 
-  // POST /api/login
-  if (method === "POST" && pathname === "/api/login") {
-    let data: { username: unknown; password: unknown };
+  // POST /auth/login — mock Kratos login
+  if (method === "POST" && pathname === "/auth/login") {
+    let data: { identifier: unknown; password: unknown };
     try {
-      data = await req.json() as { username: unknown; password: unknown };
+      data = await req.json() as { identifier: unknown; password: unknown };
     } catch {
       return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }
-    if (typeof data.username !== "string" || typeof data.password !== "string" || !data.username.trim() || !data.password) {
-      return Response.json({ error: "Username and password are required" }, { status: 400 });
+    if (typeof data.identifier !== "string" || typeof data.password !== "string" || !data.identifier.trim() || !data.password) {
+      return Response.json({ error: "Email and password are required" }, { status: 400 });
     }
     if (data.password !== MOCK_PASSWORD) {
-      return Response.json({ error: "Invalid username or password" }, { status: 401 });
+      return Response.json({ error: "Invalid email or password" }, { status: 401 });
     }
-    return Response.json({
-      token: "mock-bearer-token-" + data.username.trim(),
-      username: data.username.trim(),
-    });
+    // In mock mode, login immediately issues a session cookie (skips OAuth2 flow)
+    const username = data.identifier.trim();
+    const token = "mock-bearer-token-" + username;
+    const headers = new Headers({ "Content-Type": "application/json" });
+    setSessionCookie(headers, { token, username });
+    return new Response(JSON.stringify({ authenticated: true, username }), { status: 200, headers });
   }
+
+  // GET /auth/session — check session cookie, return session info
+  if (method === "GET" && pathname === "/auth/session") {
+    const session = getSessionFromCookie(req);
+    if (session) {
+      return Response.json({ authenticated: true, username: session.username });
+    }
+    return Response.json({ authenticated: false }, { status: 401 });
+  }
+
+  // POST /auth/logout — clear session cookie
+  if (method === "POST" && pathname === "/auth/logout") {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    clearSessionCookie(headers);
+    return new Response(JSON.stringify({ loggedOut: true }), { status: 200, headers });
+  }
+
+  return null; // not an auth route
+}
+
+// --- Mock API handlers ---
+
+async function handleMockApi(req: Request, pathname: string): Promise<Response> {
+  // Enforce session authentication in mock mode (mirrors real mode's Bearer token requirement)
+  const session = getSessionFromCookie(req);
+  if (!session) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const method = req.method;
 
   // GET /api/accounts
   if (method === "GET" && pathname === "/api/accounts") {
@@ -232,7 +293,6 @@ function resolveTristateUpdate(data: Record<string, unknown>, key: string, exist
 const PROXY_ALLOWED_HEADERS = [
   "content-type",
   "accept",
-  "authorization",
   "content-length",
 ];
 
@@ -246,6 +306,12 @@ async function proxyToEmumet(req: Request, pathname: string): Promise<Response> 
     if (value) headers.set(key, value);
   }
 
+  // Inject Bearer token from session cookie (NEVER forward browser's Authorization header)
+  const session = getSessionFromCookie(req);
+  if (session) {
+    headers.set("Authorization", "Bearer " + session.token);
+  }
+
   const proxyReq = new Request(targetUrl, {
     method: req.method,
     headers,
@@ -254,14 +320,18 @@ async function proxyToEmumet(req: Request, pathname: string): Promise<Response> 
 
   try {
     const response = await fetch(proxyReq);
+    // Strip upstream Set-Cookie to prevent backend from overwriting frontend cookies
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete("set-cookie");
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers,
+      headers: responseHeaders,
     });
   } catch (err) {
+    console.error("Proxy error:", err);
     return Response.json(
-      { error: "proxy error", message: String(err) },
+      { error: "Failed to reach upstream service" },
       { status: 502 }
     );
   }
@@ -282,6 +352,17 @@ Bun.serve({
 
     const staticResponse = serveStatic(url.pathname);
     if (staticResponse) return staticResponse;
+
+    // Auth endpoints (BFF)
+    if (url.pathname.startsWith("/auth/")) {
+      if (USE_MOCK) {
+        const authResponse = await handleMockAuth(req, url.pathname);
+        if (authResponse) return authResponse;
+      } else {
+        // TODO: Real Kratos/Hydra auth handlers
+        return Response.json({ error: "Real auth not implemented" }, { status: 501 });
+      }
+    }
 
     if (url.pathname.startsWith("/api/")) {
       if (USE_MOCK) {

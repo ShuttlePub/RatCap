@@ -30,14 +30,14 @@ errorBanner = case _ of
 formSection :: LoginForm -> Boolean -> Html Message
 formSection form savePending =
   HE.form [ HA.class' (T.surface <> " p-6 space-y-5"), HA.onSubmit SubmitLogin ]
-    [ fieldGroup "Username"
+    [ fieldGroup "Email"
         [ HE.input
             [ HA.class' (inputClass <> " w-full")
-            , HA.type' "text"
-            , HA.placeholder "alice"
-            , HA.value form.username
-            , HA.onInput SetLoginUsername
-            , HA.createAttribute "autocomplete" "username"
+            , HA.type' "email"
+            , HA.placeholder "user@example.com"
+            , HA.value form.identifier
+            , HA.onInput SetLoginIdentifier
+            , HA.createAttribute "autocomplete" "email"
             ]
         ]
     , fieldGroup "Password"
@@ -54,7 +54,7 @@ formSection form savePending =
         [ HE.button
             [ HA.class' ("w-full px-4 py-2.5 text-sm font-medium text-white " <> T.bgAccent <> " " <> T.hoverBgAccent <> " " <> T.roundedTheme <> " transition-colors" <> if savePending then " opacity-50 cursor-not-allowed" else "")
             , HA.type' "submit"
-            , HA.disabled (trim form.username == "" || form.password == "" || savePending)
+            , HA.disabled (trim form.identifier == "" || form.password == "" || savePending)
             ]
             [ HE.text (if savePending then "Logging in..." else "Login") ]
         ]

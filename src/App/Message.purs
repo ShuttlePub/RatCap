@@ -1,21 +1,26 @@
 module App.Message where
 
 import App.Api.Emumet.Types (AccountResponse, MetadataResponse, ProfileResponse)
-import App.Model (AccountWithDetails)
+import App.Model (AccountWithDetails, SessionInfo)
 import App.Route (Route)
 import Data.Maybe (Maybe)
 
 data Message
   = Navigate Route
   | UrlChanged (Maybe Route)
-  -- Authentication
-  | InitAuth (Maybe String) (Maybe String) -- token, username (from sessionStorage on startup)
-  | SetLoginUsername String
+  -- Authentication (BFF-based)
+  | CheckSession -- fire GET /auth/session on startup
+  | SessionLoaded SessionInfo -- session cookie valid
+  | SessionFailed -- no session from check (ignored if session already established)
+  | SessionExpired -- API returned 401 (force re-login regardless of local state)
+  | SetLoginIdentifier String
   | SetLoginPassword String
   | SubmitLogin
-  | LoginSuccess String String -- token, username
+  | LoginSuccess String -- username (cookie set by BFF, no token in client)
   | LoginFailed String
   | Logout
+  | LogoutDone
+  | LogoutFailed String
   -- Account list
   | FetchAccounts
   | AccountsLoaded (Array AccountResponse)

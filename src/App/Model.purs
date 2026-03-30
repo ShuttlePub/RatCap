@@ -39,6 +39,11 @@ type AccountWithDetails =
   , metadata :: Array MetadataResponse
   }
 
+-- Session info from BFF (GET /auth/session)
+type SessionInfo =
+  { username :: String
+  }
+
 -- Form state for creating a new account
 type NewAccountForm =
   { name :: String
@@ -50,12 +55,12 @@ emptyNewAccountForm = { name: "", isBot: false }
 
 -- Form state for login
 type LoginForm =
-  { username :: String
+  { identifier :: String
   , password :: String
   }
 
 emptyLoginForm :: LoginForm
-emptyLoginForm = { username: "", password: "" }
+emptyLoginForm = { identifier: "", password: "" }
 
 -- Form state for editing a profile (Nothing = not editing)
 type EditProfileForm =
@@ -77,8 +82,7 @@ type Model =
   { route :: Maybe Route
   , page :: PageModel
   , isHydrated :: Boolean
-  , authToken :: Maybe String
-  , authUsername :: Maybe String
+  , session :: Maybe SessionInfo
   , loginForm :: LoginForm
   , accounts :: RemoteData (Array AccountResponse)
   , selectedAccount :: RemoteData AccountWithDetails

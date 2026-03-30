@@ -5,7 +5,6 @@ import Prelude
 import App.Message (Message(..))
 import App.Route (routeCodec)
 import App.View (view)
-import Client.Auth as SessionAuth
 import Client.Update (mkUpdate)
 import Data.Either (hush)
 import Data.Maybe (Maybe)
@@ -30,10 +29,8 @@ main = do
 
   initThemeSelector
 
-  -- Restore auth state from sessionStorage and trigger initial route evaluation
-  mToken <- SessionAuth.getToken
-  mUsername <- SessionAuth.getUsername
-  send appId (InitAuth mToken mUsername)
+  -- Check session via BFF cookie (replaces sessionStorage-based InitAuth)
+  send appId CheckSession
 
   void $ paths handlePath nav
   where
