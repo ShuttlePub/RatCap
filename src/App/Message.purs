@@ -8,6 +8,14 @@ import Data.Maybe (Maybe)
 data Message
   = Navigate Route
   | UrlChanged (Maybe Route)
+  -- Authentication
+  | InitAuth (Maybe String) (Maybe String) -- token, username (from sessionStorage on startup)
+  | SetLoginUsername String
+  | SetLoginPassword String
+  | SubmitLogin
+  | LoginSuccess String String -- token, username
+  | LoginFailed String
+  | Logout
   -- Account list
   | FetchAccounts
   | AccountsLoaded (Array AccountResponse)

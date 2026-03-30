@@ -3,20 +3,23 @@ module Client.Update where
 import Prelude
 
 import App.Api.Client (ApiError(..), printApiError)
+import App.Api.Auth as Auth
+import App.Api.Auth (LoginRequest(..), LoginResponse(..))
 import App.Api.Emumet.Client as Emumet
 import App.Api.Emumet.Tristate (Tristate(..))
 import App.Api.Emumet.Types (AccountResponse(..), CreateAccountRequest(..), CreateMetadataRequest(..), CreateProfileRequest(..), MetadataResponse(..), ProfileResponse(..), UpdateMetadataRequest(..), UpdateProfileRequest(..))
 import App.Message (Message(..))
-import App.Model (AccountWithDetails, Model, RemoteData(..), emptyNewAccountForm, pageForMaybeRoute)
+import App.Model (AccountWithDetails, Model, RemoteData(..), emptyLoginForm, emptyNewAccountForm, isProtectedRoute, pageForMaybeRoute)
 import App.Route (Route(..), routeCodec)
 import Control.Parallel (parallel, sequential)
 import Data.Array (filter, find)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
 import Data.String.Common (trim)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
+import Client.Auth as SessionAuth
 import Flame (Update, noMessages)
 import Foreign (unsafeToForeign)
 import Routing.Duplex (print)
@@ -39,16 +42,104 @@ mkUpdate nav model = case _ of
     if not model.isHydrated then noMessages $ model { isHydrated = true }
     else
       let
-        base = model { route = mRoute, page = pageForMaybeRoute mRoute, editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false }
+        -- Redirect to login if accessing protected route while unauthenticated
+        needsAuth = case mRoute of
+          Just r -> isProtectedRoute r && isNothing model.authToken
+          Nothing -> false
+        effectiveRoute = if needsAuth then Just Login else mRoute
+        base = model { route = effectiveRoute, page = pageForMaybeRoute effectiveRoute, editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false }
       in
-        case mRoute of
-          Just Home ->
-            Tuple (base { accounts = Loading }) [ pure $ Just FetchAccounts ]
-          Just (AccountDetail id) ->
-            Tuple (base { selectedAccount = Loading }) [ pure $ Just (FetchAccountDetail id) ]
-          Just AccountNew ->
-            noMessages $ base { newAccountForm = emptyNewAccountForm }
-          _ -> noMessages base
+        if needsAuth then
+          Tuple base
+            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
+        else
+          case mRoute of
+            Just Home ->
+              Tuple (base { accounts = Loading }) [ pure $ Just FetchAccounts ]
+            Just (AccountDetail id) ->
+              Tuple (base { selectedAccount = Loading }) [ pure $ Just (FetchAccountDetail id) ]
+            Just AccountNew ->
+              noMessages $ base { newAccountForm = emptyNewAccountForm }
+            Just Login ->
+              -- Redirect authenticated user away from login page
+              if isJust model.authToken then
+                let homeBase = model { route = Just Home, page = pageForMaybeRoute (Just Home), editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false, accounts = Loading }
+                in Tuple homeBase
+                  [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
+                  , pure $ Just FetchAccounts
+                  ]
+              else
+                noMessages $ base { loginForm = emptyLoginForm }
+            _ -> noMessages base
+
+  -- Authentication
+  InitAuth mToken mUsername ->
+    let
+      m = model { authToken = mToken, authUsername = mUsername }
+    in
+      case m.route of
+        Just r | isProtectedRoute r && isNothing mToken ->
+          Tuple (m { route = Just Login, page = pageForMaybeRoute (Just Login) })
+            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
+        Just Home ->
+          Tuple (m { accounts = Loading }) [ pure $ Just FetchAccounts ]
+        Just (AccountDetail id) ->
+          Tuple (m { selectedAccount = Loading }) [ pure $ Just (FetchAccountDetail id) ]
+        Just AccountNew ->
+          noMessages $ m { newAccountForm = emptyNewAccountForm }
+        Just Login ->
+          -- Redirect authenticated user away from login page
+          if isJust mToken then
+            let homeModel = m { route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
+            in Tuple homeModel
+              [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
+              , pure $ Just FetchAccounts
+              ]
+          else
+            noMessages $ m { loginForm = emptyLoginForm }
+        _ -> noMessages m
+
+  SetLoginUsername username ->
+    noMessages $ model { loginForm = model.loginForm { username = username } }
+
+  SetLoginPassword password ->
+    noMessages $ model { loginForm = model.loginForm { password = password } }
+
+  SubmitLogin ->
+    let
+      form = model.loginForm
+      trimmedUsername = trim form.username
+    in
+      if trimmedUsername == "" || form.password == "" || model.savePending then noMessages model
+      else
+        Tuple (model { errorMessage = Nothing, savePending = true })
+          [ submitLoginAff trimmedUsername form.password ]
+
+  LoginSuccess token username ->
+    if model.route == Just Login
+      then
+        Tuple (model { authToken = Just token, authUsername = Just username, loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false })
+          [ liftEffect do
+              SessionAuth.setToken token
+              SessionAuth.setUsername username
+              nav.pushState (unsafeToForeign {}) (print routeCodec Home)
+            $> Nothing
+          ]
+      else noMessages $ model { savePending = false }
+
+  LoginFailed msg ->
+    if model.route == Just Login
+      then noMessages $ model { errorMessage = Just msg, savePending = false }
+      else noMessages $ model { savePending = false }
+
+  Logout ->
+    Tuple (model { authToken = Nothing, authUsername = Nothing, loginForm = emptyLoginForm, route = Just Login, page = pageForMaybeRoute (Just Login) })
+      [ liftEffect do
+          SessionAuth.removeToken
+          SessionAuth.removeUsername
+          nav.replaceState (unsafeToForeign {}) (print routeCodec Login)
+        $> Nothing
+      ]
 
   -- Account list: fetch from API
   FetchAccounts ->
@@ -377,3 +468,18 @@ deleteMetadataAff accountId nanoid = do
   pure $ Just $ case result of
     Right _ -> MetadataDeleted accountId nanoid
     Left err -> MetadataDeleteFailed accountId (printApiError err)
+
+submitLoginAff :: String -> String -> Aff (Maybe Message)
+submitLoginAff username password = do
+  result <- Auth.login (LoginRequest { username, password })
+  pure $ Just $ case result of
+    Right (LoginResponse r) -> LoginSuccess r.token r.username
+    Left err -> LoginFailed (loginErrorMessage err)
+
+loginErrorMessage :: ApiError -> String
+loginErrorMessage = case _ of
+  HttpError 401 _ -> "Login failed: incorrect username or password"
+  HttpError 403 _ -> "Login failed: access denied"
+  HttpError 404 _ -> "Login failed: authentication service unavailable"
+  NetworkError _ -> "Login failed: network error"
+  _ -> "Login failed"

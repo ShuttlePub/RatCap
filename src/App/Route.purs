@@ -13,6 +13,7 @@ import Routing.Duplex.Generic.Syntax ((/))
 
 data Route
   = Home
+  | Login
   | Settings
   | AccountNew
   | AccountDetail String
@@ -29,6 +30,7 @@ instance DecodeJson Route where
 routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
+  , "Login": prefix "login" noArgs
   , "Settings": prefix "settings" noArgs
   , "AccountNew": "accounts" / prefix "new" noArgs
   , "AccountDetail": "accounts" / segment

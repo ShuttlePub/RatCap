@@ -10,9 +10,9 @@ import Data.Argonaut.Decode.Generic (genericDecodeJson)
 import Data.Argonaut.Encode (class EncodeJson)
 import Data.Argonaut.Encode.Generic (genericEncodeJson)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe, maybe)
 
-data PageModel = Home | Settings | AccountNew | AccountDetail | NotFound
+data PageModel = Home | Login | Settings | AccountNew | AccountDetail | NotFound
 
 derive instance Generic PageModel _
 derive instance Eq PageModel
@@ -48,6 +48,15 @@ type NewAccountForm =
 emptyNewAccountForm :: NewAccountForm
 emptyNewAccountForm = { name: "", isBot: false }
 
+-- Form state for login
+type LoginForm =
+  { username :: String
+  , password :: String
+  }
+
+emptyLoginForm :: LoginForm
+emptyLoginForm = { username: "", password: "" }
+
 -- Form state for editing a profile (Nothing = not editing)
 type EditProfileForm =
   { displayName :: String
@@ -68,6 +77,9 @@ type Model =
   { route :: Maybe Route
   , page :: PageModel
   , isHydrated :: Boolean
+  , authToken :: Maybe String
+  , authUsername :: Maybe String
+  , loginForm :: LoginForm
   , accounts :: RemoteData (Array AccountResponse)
   , selectedAccount :: RemoteData AccountWithDetails
   , newAccountForm :: NewAccountForm
@@ -80,9 +92,16 @@ type Model =
 pageForRoute :: Route -> PageModel
 pageForRoute = case _ of
   Route.Home -> Home
+  Route.Login -> Login
   Route.Settings -> Settings
   Route.AccountNew -> AccountNew
   Route.AccountDetail _ -> AccountDetail
+
+-- | Check if a route requires authentication
+isProtectedRoute :: Route -> Boolean
+isProtectedRoute = case _ of
+  Route.Login -> false
+  _ -> true
 
 pageForMaybeRoute :: Maybe Route -> PageModel
 pageForMaybeRoute = maybe NotFound pageForRoute

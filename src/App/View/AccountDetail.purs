@@ -50,7 +50,7 @@ detailView d editProfile editMetadata errorMsg savePending =
 
 errorBanner :: Maybe String -> Html Message
 errorBanner = case _ of
-  Nothing -> HE.text ""
+  Nothing -> HE.div [ HA.class' "hidden" ] []
   Just msg ->
     HE.div [ HA.class' ("px-4 py-3 text-sm " <> T.roundedTheme <> " " <> T.textError <> " border " <> T.borderTheme <> " bg-red-500/10") ]
       [ HE.text msg ]

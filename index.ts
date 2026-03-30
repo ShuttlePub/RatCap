@@ -68,8 +68,31 @@ const mockMetadata: MockMetadata[] = [
 ];
 
 // --- Mock API handlers ---
+// Mock credentials (any username with password "password" succeeds)
+const MOCK_PASSWORD = "password";
+
 async function handleMockApi(req: Request, pathname: string): Promise<Response> {
   const method = req.method;
+
+  // POST /api/login
+  if (method === "POST" && pathname === "/api/login") {
+    let data: { username: unknown; password: unknown };
+    try {
+      data = await req.json() as { username: unknown; password: unknown };
+    } catch {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    if (typeof data.username !== "string" || typeof data.password !== "string" || !data.username.trim() || !data.password) {
+      return Response.json({ error: "Username and password are required" }, { status: 400 });
+    }
+    if (data.password !== MOCK_PASSWORD) {
+      return Response.json({ error: "Invalid username or password" }, { status: 401 });
+    }
+    return Response.json({
+      token: "mock-bearer-token-" + data.username.trim(),
+      username: data.username.trim(),
+    });
+  }
 
   // GET /api/accounts
   if (method === "GET" && pathname === "/api/accounts") {

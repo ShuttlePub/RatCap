@@ -2,35 +2,57 @@ module App.View.Layout where
 
 import Prelude
 
-import App.Message (Message)
+import App.Message (Message(..))
 import App.Model (Model)
 import App.Route (Route(..))
 import App.Theme as T
 import App.View.Link (link)
+import Data.Maybe (Maybe(..), isJust)
 import Flame (Html)
 import Flame.Html.Element as HE
 import Flame.Html.Attribute as HA
 
 page :: Model -> Array (Html Message) -> Html Message
-page _model content =
+page model content =
   HE.main [ HA.id "app", HA.class' ("min-h-screen antialiased " <> T.bgSecondary <> " " <> T.textPrimary) ]
-    [ nav
+    [ nav model
     , HE.div [ HA.id "content", HA.class' "max-w-4xl mx-auto px-6 py-12" ] content
     ]
 
-nav :: Html Message
-nav =
+nav :: Model -> Html Message
+nav model =
   HE.nav [ HA.class' ("sticky top-0 z-10 backdrop-blur-md border-b " <> T.bgNav <> " " <> T.borderTheme) ]
     [ HE.div [ HA.class' "max-w-4xl mx-auto px-6" ]
         [ HE.div [ HA.class' "flex items-center justify-between h-16" ]
             [ HE.span [ HA.class' ("text-lg font-bold tracking-tight " <> T.textHeading) ] [ HE.text "Ratcap" ]
             , HE.ul [ HA.class' "flex items-center gap-1" ]
-                [ HE.li_ [ link Home [ HE.text "Home" ] ]
-                , HE.li_ [ link Settings [ HE.text "Settings" ] ]
-                ]
+                ( [ HE.li_ [ link Home [ HE.text "Home" ] ]
+                  , HE.li_ [ link Settings [ HE.text "Settings" ] ]
+                  ] <> authSection model
+                )
             ]
         ]
     ]
+
+authSection :: Model -> Array (Html Message)
+authSection model =
+  if isJust model.authToken then
+    [ HE.li_ [ HE.span [ HA.class' ("px-3 py-2 text-sm " <> T.textMuted) ] [ HE.text (showUsername model.authUsername) ] ]
+    , HE.li_
+        [ HE.button
+            [ HA.class' ("px-3 py-2 text-sm font-medium " <> T.textSecondary <> " " <> T.roundedTheme <> " transition-colors " <> T.hoverTextAccent <> " hover:bg-bg-surface")
+            , HA.onClick Logout
+            ]
+            [ HE.text "Logout" ]
+        ]
+    ]
+  else
+    [ HE.li_ [ link Login [ HE.text "Login" ] ] ]
+
+showUsername :: Maybe String -> String
+showUsername = case _ of
+  Just u -> u
+  Nothing -> ""
 
 document :: Html Message -> Html Message
 document content =

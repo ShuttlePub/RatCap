@@ -3,11 +3,12 @@ module Client where
 import Prelude
 
 import App.Message (Message(..))
-import App.Route (Route(..), routeCodec)
+import App.Route (routeCodec)
 import App.View (view)
+import Client.Auth as SessionAuth
 import Client.Update (mkUpdate)
 import Data.Either (hush)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Effect (Effect)
 import Flame (AppId(..), resumeMount)
 import Flame.Subscription (send)
@@ -29,13 +30,10 @@ main = do
 
   initThemeSelector
 
-  -- Initial route-based data fetching
-  loc <- nav.locationState
-  let currentRoute = hush $ parse routeCodec loc.path
-  case currentRoute of
-    Just Home -> send appId FetchAccounts
-    Just (AccountDetail id) -> send appId (FetchAccountDetail id)
-    _ -> pure unit
+  -- Restore auth state from sessionStorage and trigger initial route evaluation
+  mToken <- SessionAuth.getToken
+  mUsername <- SessionAuth.getUsername
+  send appId (InitAuth mToken mUsername)
 
   void $ paths handlePath nav
   where
