@@ -9,6 +9,7 @@ import App.Route as Route
 import App.Theme as T
 import App.View.Link as Link
 import App.Format (formatDate)
+import Data.Array (null) as Array
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (take)
 import Data.String.Common (toUpper)
@@ -49,7 +50,7 @@ newAccountButton =
 accountsSection :: RemoteData (Array AccountResponse) -> Html Message
 accountsSection = case _ of
   NotAsked ->
-    HE.text ""
+    HE.div [ HA.class' "hidden" ] []
   Loading ->
     HE.div [ HA.class' ("flex items-center gap-2 " <> T.textMuted) ]
       [ HE.text "Loading accounts..." ]
@@ -57,8 +58,11 @@ accountsSection = case _ of
     HE.div [ HA.class' ("flex items-center gap-2 " <> T.textError) ]
       [ HE.text "Failed to load accounts." ]
   Loaded accs ->
-    HE.div [ HA.class' "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" ]
-      (map accountCard accs)
+    if Array.null accs
+      then HE.div [ HA.class' ("text-center py-12 " <> T.textMuted) ]
+        [ HE.text "No accounts yet. Create one to get started." ]
+      else HE.div [ HA.class' "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" ]
+        (map accountCard accs)
 
 accountCard :: AccountResponse -> Html Message
 accountCard (AccountResponse acc) =

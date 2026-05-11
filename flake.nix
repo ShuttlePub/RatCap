@@ -46,6 +46,7 @@
             purs-tidy
             esbuild
             watchexec
+            openssl
           ];
         };
       }

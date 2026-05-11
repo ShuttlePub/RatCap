@@ -27,7 +27,8 @@ Development tools are managed via Nix flake + direnv. Entering the project direc
 - **SSR:** `Server.purs` renders full HTML via `Flame.Renderer.String`, with serialized state embedded in `<template-state>` for hydration
 - **Client:** `Client.purs` hydrates SSR HTML via `Flame.resumeMount`, then handles client-side routing with `matchesWith`
 - **Styling:** Tailwind CSS v4 — utility classes applied directly via `HA.class'` in PureScript views; `src/style.css` is the entry point with `@source "../src/**/*.purs"` to scan PureScript files for class names
-- **Dev server:** `index.ts` — Bun.serve() handles SSR (all routes), static files (`/app.js`, `/style.css`), and API stub (`/api/*`)
+- **Auth (BFF):** `index.ts` implements BFF (Backend-for-Frontend) auth — mock mode (built-in) and real mode (Kratos + Hydra OAuth2 PKCE). Session is stored in an AES-GCM encrypted HttpOnly cookie (`ratcap_session`). `/api/*` proxy injects Bearer token from session cookie.
+- **Dev server:** `index.ts` — Bun.serve() handles SSR (all routes), static files (`/app.js`, `/style.css`), auth endpoints (`/auth/*`), and API proxy (`/api/*`)
 - **Dev script:** `scripts/dev.sh` — triple bundle (client + server + CSS) + watchexec (auto-rebuild on `.purs` changes) + Tailwind `--watch` + Bun dev server
 - **PureScript packages:** managed by `spago.yaml`, uses registry package set
 - **JS dependencies:** managed by `package.json` / `bun.lock`
@@ -38,20 +39,42 @@ Development tools are managed via Nix flake + direnv. Entering the project direc
 src/
   style.css               -- Tailwind CSS entry point (@import "tailwindcss" + @source)
   App/
-    Route.purs            -- Route ADT + routing-duplex codec
-    Model.purs            -- Model type (Maybe Route, PageModel, isHydrated) + JSON instances
-    Message.purs          -- Message ADT (Navigate, UrlChanged, PageLoaded)
+    Route.purs            -- Route ADT (Home, Settings, AccountNew, AccountDetail, Login) + routing-duplex codec
+    Model.purs            -- Model type (Maybe Route, PageModel, SessionInfo, isHydrated) + JSON instances
+    Message.purs          -- Message ADT (Navigate, UrlChanged, CheckSession, Login/Logout, etc.)
     View.purs             -- Top-level view dispatcher
+    Api/
+      Client.purs         -- Generic HTTP client (Affjax-based: get, post, put, delete)
+      Auth.purs           -- Auth API calls (login, checkSession, logout) via BFF /auth/* endpoints
+      Emumet/
+        Client.purs       -- Emumet API wrappers over Api.Client
+        Types.purs        -- Auto-generated Emumet API types (DO NOT EDIT)
+        Tristate.purs     -- Tristate type for optional update fields
     View/
-      Layout.purs         -- HTML shell (<html>/<head>/<body>) + navigation
-      Home.purs           -- Home page view
-      About.purs          -- About page view
+      Layout.purs         -- HTML shell (<html>/<head>/<body>) + auth-aware navigation
+      Login.purs          -- Login page view (email + password form)
+      Accounts.purs       -- Account list view
+      AccountNew.purs     -- New account form view
+      AccountDetail.purs  -- Account detail/edit view
+      Settings.purs       -- Settings page view
       NotFound.purs       -- 404 view
       Link.purs           -- SPA <a> with preventDefault + Navigate message
-  Client.purs             -- Client entry: resumeMount + matchesWith routing
+    Theme.purs            -- Semantic Tailwind class helpers (Catppuccin-mocha theme)
+    Format.purs           -- Date/time formatting helpers
+  Client.purs             -- Client entry: resumeMount + CheckSession + route subscription
   Client/
-    Update.purs           -- Client update function (Navigate→pushState, UrlChanged→Model update)
+    Update.purs           -- Client update function (auth, navigation, API calls)
+    Navigation.js         -- FFI: window.location.assign for full-page redirects
+    Navigation.purs       -- PureScript binding for navigation FFI
+    Fetch.js              -- FFI: alternative fetch implementation (unused)
+    Fetch.purs            -- Alternative fetch module with bearer token (unused)
   Server.purs             -- Server entry: renderPage for SSR HTML generation
+scripts/
+  dev.sh                  -- Dev server (build + watch + serve)
+  register-hydra-client.ts -- Register OAuth2 client in Hydra (real mode setup)
+  fetch-openapi.ts        -- Fetch OpenAPI spec from Emumet
+  generate-api.ts         -- Generate PureScript types from OpenAPI spec
+  sync-api.ts             -- Sync API types (fetch + generate)
 ```
 
 ### Key Design Decisions

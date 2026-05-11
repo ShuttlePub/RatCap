@@ -3,19 +3,20 @@ module App.Api.Emumet.Client where
 import Prelude
 
 import App.Api.Client as Api
-import App.Api.Client (ApiError)
+import App.Api.Client (ApiError(..))
 import App.Api.Emumet.Types
   ( AccountResponse
   , AccountsResponse(..)
   , CreateAccountRequest
   , CreateMetadataRequest
-  , CreateProfileRequest
   , MetadataResponse
   , ProfileResponse
   , UpdateMetadataRequest
   , UpdateProfileRequest
   )
-import Data.Either (Either)
+import Data.Array (head)
+import Data.Either (Either(..))
+import Data.Maybe (maybe)
 import Effect.Aff (Aff)
 
 -- Base path for all Emumet API calls (proxied through Bun)
@@ -28,21 +29,23 @@ fetchAccounts = do
   result <- Api.get (basePath <> "/accounts")
   pure $ map (\(AccountsResponse r) -> r.items) result
 
--- | GET /accounts/:id -> AccountResponse
+-- | GET /accounts?ids=:id -> AccountResponse (extracted from items)
 fetchAccount :: String -> Aff (Either ApiError AccountResponse)
-fetchAccount id = Api.get (basePath <> "/accounts/" <> id)
+fetchAccount targetId = do
+  result <- Api.get (basePath <> "/accounts?ids=" <> targetId)
+  pure $ result >>= \(AccountsResponse r) ->
+    maybe (Left (HttpError 404 "Account not found")) Right (head r.items)
 
 -- | POST /accounts -> AccountResponse
 createAccount :: CreateAccountRequest -> Aff (Either ApiError AccountResponse)
 createAccount = Api.post (basePath <> "/accounts")
 
--- | GET /accounts/:id/profile -> ProfileResponse
+-- | GET /profiles?account_ids=:id -> ProfileResponse (extracted from array)
 fetchProfile :: String -> Aff (Either ApiError ProfileResponse)
-fetchProfile accountId = Api.get (basePath <> "/accounts/" <> accountId <> "/profile")
-
--- | POST /accounts/:id/profile -> ProfileResponse
-createProfile :: String -> CreateProfileRequest -> Aff (Either ApiError ProfileResponse)
-createProfile accountId = Api.post (basePath <> "/accounts/" <> accountId <> "/profile")
+fetchProfile accountId = do
+  result <- Api.get (basePath <> "/profiles?account_ids=" <> accountId)
+  pure $ result >>= \(profiles :: Array ProfileResponse) ->
+    maybe (Left (HttpError 404 "Profile not found")) Right (head profiles)
 
 -- | PUT /accounts/:id/profile -> ProfileResponse
 updateProfile :: String -> UpdateProfileRequest -> Aff (Either ApiError ProfileResponse)

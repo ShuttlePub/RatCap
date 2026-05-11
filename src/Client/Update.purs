@@ -7,7 +7,7 @@ import App.Api.Auth as Auth
 import App.Api.Auth (LoginRequest(..), LoginResponse(..), SessionResponse(..))
 import App.Api.Emumet.Client as Emumet
 import App.Api.Emumet.Tristate (Tristate(..))
-import App.Api.Emumet.Types (AccountResponse(..), CreateAccountRequest(..), CreateMetadataRequest(..), CreateProfileRequest(..), MetadataResponse(..), ProfileResponse(..), UpdateMetadataRequest(..), UpdateProfileRequest(..))
+import App.Api.Emumet.Types (AccountResponse(..), CreateAccountRequest(..), CreateMetadataRequest(..), MetadataResponse(..), ProfileResponse(..), UpdateMetadataRequest(..), UpdateProfileRequest(..))
 import App.Message (Message(..))
 import App.Model (AccountWithDetails, Model, RemoteData(..), emptyLoginForm, emptyNewAccountForm, isProtectedRoute, pageForMaybeRoute)
 import App.Route (Route(..), routeCodec)
@@ -22,7 +22,9 @@ import Effect.Class (liftEffect)
 import Flame (Update, noMessages)
 import Foreign (unsafeToForeign)
 import Routing.Duplex (print)
+import Client.Navigation (_navigateToUrl)
 import Routing.PushState (PushStateInterface)
+
 
 -- | Get the current account ID from selectedAccount, if loaded
 currentAccountId :: Model -> Maybe String
@@ -140,15 +142,16 @@ mkUpdate nav model = case _ of
         Tuple (model { errorMessage = Nothing, savePending = true })
           [ submitLoginAff trimmedIdentifier form.password ]
 
-  LoginSuccess username ->
-    -- BFF has set the session cookie; update local state
+  LoginSuccess _username ->
+    -- BFF has set the session cookie via /auth/login.
+    -- Navigate to /auth/oauth/start which will:
+    --   - Mock mode: 302 back to return_to (/) — session cookie already set
+    --   - Real mode: redirect to Hydra OAuth2 flow → callback → session cookie → return_to
+    -- Full page reload will trigger CheckSession to establish local session state.
     if model.route == Just Login
       then
-        let homeModel = model { session = Just { username }, loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false, route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
-        in Tuple homeModel
-          [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
-          , pure $ Just FetchAccounts
-          ]
+        Tuple (model { loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false })
+          [ liftEffect (_navigateToUrl "/auth/oauth/start?return_to=/") $> Nothing ]
       else noMessages $ model { savePending = false }
 
   LoginFailed msg ->
@@ -278,17 +281,13 @@ mkUpdate nav model = case _ of
             trimmedIconUrl = trim form.iconUrl
             trimmedBannerUrl = trim form.bannerUrl
             allEmpty = trimmedDisplayName == "" && trimmedSummary == "" && trimmedIconUrl == "" && trimmedBannerUrl == ""
-            hasExistingProfile = case d.profile of
-              Just _ -> true
-              Nothing -> false
             toTristate s = if s == "" then SetNull else Value s
           in
-            -- If all empty AND no existing profile, just close the form
-            -- If all empty AND existing profile, send all SetNull to clear
-            if allEmpty && not hasExistingProfile then noMessages $ model { editProfileForm = Nothing }
+            -- If all empty, send all SetNull to clear
+            if allEmpty then noMessages $ model { editProfileForm = Nothing }
             else
               Tuple (model { errorMessage = Nothing, savePending = true })
-                [ saveProfileAff acc.id hasExistingProfile
+                [ saveProfileAff acc.id
                     { displayName: toTristate trimmedDisplayName
                     , summary: toTristate trimmedSummary
                     , iconUrl: toTristate trimmedIconUrl
@@ -490,12 +489,9 @@ submitNewAccountAff name isBot = do
     Left err | isUnauthorized err -> SessionExpired
     Left err -> AccountCreateFailed (printApiError err)
 
-saveProfileAff :: String -> Boolean -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
-saveProfileAff accountId hasExisting fields = do
-  result <-
-    if hasExisting
-      then Emumet.updateProfile accountId (UpdateProfileRequest fields)
-      else Emumet.createProfile accountId (CreateProfileRequest fields)
+saveProfileAff :: String -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
+saveProfileAff accountId fields = do
+  result <- Emumet.updateProfile accountId (UpdateProfileRequest fields)
   pure $ Just $ case result of
     Right profile -> ProfileSaved accountId profile
     Left err | isUnauthorized err -> SessionExpired
