@@ -80,3 +80,20 @@ delete url = do
       if code >= 200 && code < 300
         then Right unit
         else Left $ HttpError code response.statusText
+
+-- | PUT with JSON body and no response body (e.g. 204 No Content)
+putUnit :: forall req. EncodeJson req => String -> req -> Aff (Either ApiError Unit)
+putUnit url body = do
+  result <- AX.request $ AX.defaultRequest
+    { url = url
+    , method = Left PUT
+    , content = Just $ AXRB.json (encodeJson body)
+    , responseFormat = AXRF.ignore
+    }
+  pure $ case result of
+    Left err -> Left $ NetworkError (AX.printError err)
+    Right response ->
+      let StatusCode code = response.status in
+      if code >= 200 && code < 300
+        then Right unit
+        else Left $ HttpError code response.statusText

@@ -47,9 +47,9 @@ fetchProfile accountId = do
   pure $ result >>= \(profiles :: Array ProfileResponse) ->
     maybe (Left (HttpError 404 "Profile not found")) Right (head profiles)
 
--- | PUT /accounts/:id/profile -> ProfileResponse
-updateProfile :: String -> UpdateProfileRequest -> Aff (Either ApiError ProfileResponse)
-updateProfile accountId = Api.put (basePath <> "/accounts/" <> accountId <> "/profile")
+-- | PUT /accounts/:id/profile -> 204 No Content
+updateProfile :: String -> UpdateProfileRequest -> Aff (Either ApiError Unit)
+updateProfile accountId = Api.putUnit (basePath <> "/accounts/" <> accountId <> "/profile")
 
 -- | GET /metadata?account_ids=:id -> Array MetadataResponse
 fetchMetadata :: String -> Aff (Either ApiError (Array MetadataResponse))
@@ -59,9 +59,9 @@ fetchMetadata accountId = Api.get (basePath <> "/metadata?account_ids=" <> accou
 createMetadata :: String -> CreateMetadataRequest -> Aff (Either ApiError MetadataResponse)
 createMetadata accountId = Api.post (basePath <> "/accounts/" <> accountId <> "/metadata")
 
--- | PUT /accounts/:id/metadata/:nanoid -> MetadataResponse
-updateMetadata :: String -> String -> UpdateMetadataRequest -> Aff (Either ApiError MetadataResponse)
-updateMetadata accountId nanoid = Api.put (basePath <> "/accounts/" <> accountId <> "/metadata/" <> nanoid)
+-- | PUT /accounts/:id/metadata/:nanoid -> 204 No Content
+updateMetadata :: String -> String -> UpdateMetadataRequest -> Aff (Either ApiError Unit)
+updateMetadata accountId nanoid = Api.putUnit (basePath <> "/accounts/" <> accountId <> "/metadata/" <> nanoid)
 
 -- | DELETE /accounts/:id/metadata/:nanoid
 deleteMetadata :: String -> String -> Aff (Either ApiError Unit)

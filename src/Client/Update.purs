@@ -492,20 +492,42 @@ submitNewAccountAff name isBot = do
 saveProfileAff :: String -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
 saveProfileAff accountId fields = do
   result <- Emumet.updateProfile accountId (UpdateProfileRequest fields)
-  pure $ Just $ case result of
-    Right profile -> ProfileSaved accountId profile
-    Left err | isUnauthorized err -> SessionExpired
-    Left err -> ProfileSaveFailed accountId (printApiError err)
+  case result of
+    Left err | isUnauthorized err -> pure $ Just SessionExpired
+    Left err -> pure $ Just $ ProfileSaveFailed accountId (printApiError err)
+    Right _ -> do
+      -- PUT returns 204 No Content; re-fetch to get the updated profile
+      fetched <- Emumet.fetchProfile accountId
+      pure $ Just $ case fetched of
+        Right profile -> ProfileSaved accountId profile
+        Left err | isUnauthorized err -> SessionExpired
+        Left err -> ProfileSaveFailed accountId (printApiError err)
 
 saveMetadataAff :: String -> Maybe String -> { label :: String, content :: String } -> Aff (Maybe Message)
 saveMetadataAff accountId mNanoid fields = do
-  result <- case mNanoid of
-    Just nanoid -> Emumet.updateMetadata accountId nanoid (UpdateMetadataRequest fields)
-    Nothing -> Emumet.createMetadata accountId (CreateMetadataRequest fields)
-  pure $ Just $ case result of
-    Right meta -> MetadataSaved accountId meta
-    Left err | isUnauthorized err -> SessionExpired
-    Left err -> MetadataSaveFailed accountId (printApiError err)
+  case mNanoid of
+    Just nanoid -> do
+      -- Update path: PUT returns 204, re-fetch metadata list and pick this entry
+      result <- Emumet.updateMetadata accountId nanoid (UpdateMetadataRequest fields)
+      case result of
+        Left err | isUnauthorized err -> pure $ Just SessionExpired
+        Left err -> pure $ Just $ MetadataSaveFailed accountId (printApiError err)
+        Right _ -> do
+          fetched <- Emumet.fetchMetadata accountId
+          pure $ Just $ case fetched of
+            Left err | isUnauthorized err -> SessionExpired
+            Left err -> MetadataSaveFailed accountId (printApiError err)
+            Right metas ->
+              case findMetadata nanoid metas of
+                Just meta -> MetadataSaved accountId meta
+                Nothing -> MetadataSaveFailed accountId "Updated metadata not found"
+    Nothing -> do
+      -- Create path: POST returns 201 + body
+      result <- Emumet.createMetadata accountId (CreateMetadataRequest fields)
+      pure $ Just $ case result of
+        Right meta -> MetadataSaved accountId meta
+        Left err | isUnauthorized err -> SessionExpired
+        Left err -> MetadataSaveFailed accountId (printApiError err)
 
 deleteMetadataAff :: String -> String -> Aff (Maybe Message)
 deleteMetadataAff accountId nanoid = do
