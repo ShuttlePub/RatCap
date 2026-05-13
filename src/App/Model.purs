@@ -37,6 +37,8 @@ type AccountWithDetails =
   { account :: AccountResponse
   , profile :: Maybe ProfileResponse
   , metadata :: Array MetadataResponse
+  , profileStale :: Boolean
+  , metadataStale :: Boolean
   }
 
 -- Session info from BFF (GET /auth/session)
@@ -91,6 +93,10 @@ type Model =
   , editMetadataForm :: Maybe EditMetadataForm
   , errorMessage :: Maybe String
   , savePending :: Boolean
+  -- Monotonic counter incremented on each save-initiating action. Carried into
+  -- in-flight save messages so handlers can ignore results from stale operations
+  -- (e.g. user navigated away then back, or fired a second save).
+  , saveGeneration :: Int
   }
 
 pageForRoute :: Route -> PageModel

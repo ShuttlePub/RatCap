@@ -282,12 +282,13 @@ mkUpdate nav model = case _ of
             trimmedBannerUrl = trim form.bannerUrl
             allEmpty = trimmedDisplayName == "" && trimmedSummary == "" && trimmedIconUrl == "" && trimmedBannerUrl == ""
             toTristate s = if s == "" then SetNull else Value s
+            newGen = model.saveGeneration + 1
           in
             -- If all empty, send all SetNull to clear
             if allEmpty then noMessages $ model { editProfileForm = Nothing }
             else
-              Tuple (model { errorMessage = Nothing, savePending = true })
-                [ saveProfileAff acc.id
+              Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
+                [ saveProfileAff newGen acc.id
                     { displayName: toTristate trimmedDisplayName
                     , summary: toTristate trimmedSummary
                     , iconUrl: toTristate trimmedIconUrl
@@ -296,13 +297,14 @@ mkUpdate nav model = case _ of
                 ]
       _, _ -> noMessages model
 
-  ProfileSaved accountId profile ->
-    -- Guard: only apply if we're still viewing the same account
-    if currentAccountId model == Just accountId
+  ProfileSaved gen accountId profile ->
+    -- Only apply if this is the most recent in-flight save AND we're still viewing the same account
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
       then case model.selectedAccount of
         Loaded d ->
           noMessages $ model
-            { selectedAccount = Loaded (d { profile = Just profile })
+            { selectedAccount = Loaded (d { profile = Just profile, profileStale = false })
             , editProfileForm = Nothing
             , errorMessage = Nothing
             , savePending = false
@@ -310,10 +312,26 @@ mkUpdate nav model = case _ of
         _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
       else noMessages $ model { savePending = false }
 
-  ProfileSaveFailed accountId msg ->
-    -- Guard: only show error if still viewing the same account
-    if currentAccountId model == Just accountId
+  ProfileSaveFailed gen accountId msg ->
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
       then noMessages $ model { errorMessage = Just msg, savePending = false }
+      else noMessages $ model { savePending = false }
+
+  ProfileSavedRefreshFailed gen accountId _refreshErr ->
+    -- Save succeeded; only the follow-up re-fetch failed. Mark the profile as stale
+    -- so the View renders a persistent banner until the user gets a fresh state.
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
+      then case model.selectedAccount of
+        Loaded d ->
+          noMessages $ model
+            { selectedAccount = Loaded (d { profileStale = true })
+            , editProfileForm = Nothing
+            , savePending = false
+            , errorMessage = Nothing
+            }
+        _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
       else noMessages $ model { savePending = false }
 
   CancelEditProfile ->
@@ -350,19 +368,20 @@ mkUpdate nav model = case _ of
           let
             trimmedLabel = trim form.label
             trimmedContent = trim form.content
+            newGen = model.saveGeneration + 1
           in
             if trimmedLabel == "" || trimmedContent == "" then noMessages model
             else
               let AccountResponse acc = d.account
-              in Tuple (model { errorMessage = Nothing, savePending = true })
-                [ saveMetadataAff acc.id form.id
+              in Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
+                [ saveMetadataAff newGen acc.id form.id
                     { label: trimmedLabel, content: trimmedContent }
                 ]
       _, _ -> noMessages model
 
-  MetadataSaved accountId meta ->
-    -- Guard: only apply if we're still viewing the same account
-    if currentAccountId model == Just accountId
+  MetadataSaved gen accountId meta ->
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
       then case model.selectedAccount of
         Loaded d ->
           let
@@ -372,7 +391,7 @@ mkUpdate nav model = case _ of
               Nothing -> d.metadata <> [ meta ]
           in
             noMessages $ model
-              { selectedAccount = Loaded (d { metadata = newMetadata })
+              { selectedAccount = Loaded (d { metadata = newMetadata, metadataStale = false })
               , editMetadataForm = Nothing
               , errorMessage = Nothing
               , savePending = false
@@ -380,10 +399,26 @@ mkUpdate nav model = case _ of
         _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
       else noMessages $ model { savePending = false }
 
-  MetadataSaveFailed accountId msg ->
-    -- Guard: only show error if still viewing the same account
-    if currentAccountId model == Just accountId
+  MetadataSaveFailed gen accountId msg ->
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
       then noMessages $ model { errorMessage = Just msg, savePending = false }
+      else noMessages $ model { savePending = false }
+
+  MetadataSavedRefreshFailed gen accountId _refreshErr ->
+    -- Save succeeded; only the follow-up re-fetch failed (or returned list missing the item).
+    -- Mark metadata as stale so the View renders a persistent banner.
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
+      then case model.selectedAccount of
+        Loaded d ->
+          noMessages $ model
+            { selectedAccount = Loaded (d { metadataStale = true })
+            , editMetadataForm = Nothing
+            , savePending = false
+            , errorMessage = Nothing
+            }
+        _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
       else noMessages $ model { savePending = false }
 
   CancelMetadata ->
@@ -394,14 +429,16 @@ mkUpdate nav model = case _ of
       Loaded d ->
         if model.savePending then noMessages model
         else
-          let AccountResponse acc = d.account
-          in Tuple (model { errorMessage = Nothing, savePending = true })
-            [ deleteMetadataAff acc.id nanoid ]
+          let
+            AccountResponse acc = d.account
+            newGen = model.saveGeneration + 1
+          in Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
+            [ deleteMetadataAff newGen acc.id nanoid ]
       _ -> noMessages model
 
-  MetadataDeleted accountId nanoid ->
-    -- Guard: only apply if we're still viewing the same account
-    if currentAccountId model == Just accountId
+  MetadataDeleted gen accountId nanoid ->
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
       then case model.selectedAccount of
         Loaded d ->
           let newMetadata = filter (\(MetadataResponse m) -> m.nanoid /= nanoid) d.metadata
@@ -409,9 +446,9 @@ mkUpdate nav model = case _ of
         _ -> noMessages $ model { savePending = false }
       else noMessages $ model { savePending = false }
 
-  MetadataDeleteFailed accountId msg ->
-    -- Guard: only show error if still viewing the same account
-    if currentAccountId model == Just accountId
+  MetadataDeleteFailed gen accountId msg ->
+    if gen /= model.saveGeneration then noMessages model
+    else if currentAccountId model == Just accountId
       then noMessages $ model { errorMessage = Just msg, savePending = false }
       else noMessages $ model { savePending = false }
 
@@ -478,7 +515,7 @@ fetchAccountDetailAff id = do
             Right profile, Right metadata ->
               let
                 detail :: AccountWithDetails
-                detail = { account: acc, profile, metadata }
+                detail = { account: acc, profile, metadata, profileStale: false, metadataStale: false }
               in pure $ Just $ AccountDetailLoaded id detail
 
 submitNewAccountAff :: String -> Boolean -> Aff (Maybe Message)
@@ -489,53 +526,56 @@ submitNewAccountAff name isBot = do
     Left err | isUnauthorized err -> SessionExpired
     Left err -> AccountCreateFailed (printApiError err)
 
-saveProfileAff :: String -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
-saveProfileAff accountId fields = do
+saveProfileAff :: Int -> String -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
+saveProfileAff gen accountId fields = do
   result <- Emumet.updateProfile accountId (UpdateProfileRequest fields)
   case result of
     Left err | isUnauthorized err -> pure $ Just SessionExpired
-    Left err -> pure $ Just $ ProfileSaveFailed accountId (printApiError err)
+    Left err -> pure $ Just $ ProfileSaveFailed gen accountId (printApiError err)
     Right _ -> do
-      -- PUT returns 204 No Content; re-fetch to get the updated profile
+      -- PUT returns 204 No Content; re-fetch to get the updated profile.
+      -- Save itself succeeded, so a re-fetch failure must NOT be reported as a save failure.
       fetched <- Emumet.fetchProfile accountId
       pure $ Just $ case fetched of
-        Right profile -> ProfileSaved accountId profile
+        Right profile -> ProfileSaved gen accountId profile
         Left err | isUnauthorized err -> SessionExpired
-        Left err -> ProfileSaveFailed accountId (printApiError err)
+        Left err -> ProfileSavedRefreshFailed gen accountId (printApiError err)
 
-saveMetadataAff :: String -> Maybe String -> { label :: String, content :: String } -> Aff (Maybe Message)
-saveMetadataAff accountId mNanoid fields = do
+saveMetadataAff :: Int -> String -> Maybe String -> { label :: String, content :: String } -> Aff (Maybe Message)
+saveMetadataAff gen accountId mNanoid fields = do
   case mNanoid of
     Just nanoid -> do
-      -- Update path: PUT returns 204, re-fetch metadata list and pick this entry
+      -- Update path: PUT returns 204, re-fetch metadata list and pick this entry.
+      -- Save itself succeeded, so a re-fetch failure (or item-not-found in the refreshed list)
+      -- must NOT be reported as a save failure.
       result <- Emumet.updateMetadata accountId nanoid (UpdateMetadataRequest fields)
       case result of
         Left err | isUnauthorized err -> pure $ Just SessionExpired
-        Left err -> pure $ Just $ MetadataSaveFailed accountId (printApiError err)
+        Left err -> pure $ Just $ MetadataSaveFailed gen accountId (printApiError err)
         Right _ -> do
           fetched <- Emumet.fetchMetadata accountId
           pure $ Just $ case fetched of
             Left err | isUnauthorized err -> SessionExpired
-            Left err -> MetadataSaveFailed accountId (printApiError err)
+            Left err -> MetadataSavedRefreshFailed gen accountId (printApiError err)
             Right metas ->
               case findMetadata nanoid metas of
-                Just meta -> MetadataSaved accountId meta
-                Nothing -> MetadataSaveFailed accountId "Updated metadata not found"
+                Just meta -> MetadataSaved gen accountId meta
+                Nothing -> MetadataSavedRefreshFailed gen accountId "Saved, but the updated item was not found in the refreshed list"
     Nothing -> do
       -- Create path: POST returns 201 + body
       result <- Emumet.createMetadata accountId (CreateMetadataRequest fields)
       pure $ Just $ case result of
-        Right meta -> MetadataSaved accountId meta
+        Right meta -> MetadataSaved gen accountId meta
         Left err | isUnauthorized err -> SessionExpired
-        Left err -> MetadataSaveFailed accountId (printApiError err)
+        Left err -> MetadataSaveFailed gen accountId (printApiError err)
 
-deleteMetadataAff :: String -> String -> Aff (Maybe Message)
-deleteMetadataAff accountId nanoid = do
+deleteMetadataAff :: Int -> String -> String -> Aff (Maybe Message)
+deleteMetadataAff gen accountId nanoid = do
   result <- Emumet.deleteMetadata accountId nanoid
   pure $ Just $ case result of
-    Right _ -> MetadataDeleted accountId nanoid
+    Right _ -> MetadataDeleted gen accountId nanoid
     Left err | isUnauthorized err -> SessionExpired
-    Left err -> MetadataDeleteFailed accountId (printApiError err)
+    Left err -> MetadataDeleteFailed gen accountId (printApiError err)
 
 submitLoginAff :: String -> String -> Aff (Maybe Message)
 submitLoginAff identifier password = do

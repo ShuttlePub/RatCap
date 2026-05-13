@@ -42,8 +42,9 @@ data Message
   | SetEditProfileIconUrl String
   | SetEditProfileBannerUrl String
   | SaveProfile
-  | ProfileSaved String ProfileResponse
-  | ProfileSaveFailed String String -- accountId, errorMsg
+  | ProfileSaved Int String ProfileResponse -- generation, accountId, profile
+  | ProfileSavedRefreshFailed Int String String -- generation, accountId, refresh error (save succeeded, re-fetch failed)
+  | ProfileSaveFailed Int String String -- generation, accountId, errorMsg
   | CancelEditProfile
   -- Metadata editing
   | StartAddMetadata
@@ -51,9 +52,10 @@ data Message
   | SetMetadataLabel String
   | SetMetadataContent String
   | SaveMetadata
-  | MetadataSaved String MetadataResponse
-  | MetadataSaveFailed String String -- accountId, errorMsg
+  | MetadataSaved Int String MetadataResponse -- generation, accountId, metadata
+  | MetadataSavedRefreshFailed Int String String -- generation, accountId, refresh error (save succeeded, re-fetch failed)
+  | MetadataSaveFailed Int String String -- generation, accountId, errorMsg
   | CancelMetadata
   | DeleteMetadata String
-  | MetadataDeleted String String
-  | MetadataDeleteFailed String String -- accountId, errorMsg
+  | MetadataDeleted Int String String -- generation, accountId, nanoid
+  | MetadataDeleteFailed Int String String -- generation, accountId, errorMsg

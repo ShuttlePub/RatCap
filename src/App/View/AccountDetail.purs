@@ -41,12 +41,30 @@ detailView d editProfile editMetadata errorMsg savePending =
       [ bannerSection d.profile
       , profileHeader acc d.profile
       , errorBanner errorMsg
+      , staleBanner d.profileStale d.metadataStale
       , case editProfile of
           Just form -> editProfileSection form savePending
           Nothing -> profileSection d.profile
       , metadataSection d.metadata editMetadata savePending
       , accountInfoSection acc
       ]
+
+-- Persistent banner shown when the on-screen profile/metadata may be stale
+-- because the post-save re-fetch failed. Disappears only on a successful refresh.
+staleBanner :: Boolean -> Boolean -> Html Message
+staleBanner profileStale metadataStale =
+  case profileStale, metadataStale of
+    false, false -> HE.div [ HA.class' "hidden" ] []
+    _, _ ->
+      let
+        what = case profileStale, metadataStale of
+          true, true -> "profile and metadata"
+          true, false -> "profile"
+          false, true -> "metadata"
+          false, false -> ""
+      in
+        HE.div [ HA.class' ("px-4 py-3 text-sm " <> T.roundedTheme <> " border " <> T.borderTheme <> " bg-yellow-500/10 " <> T.textPrimary) ]
+          [ HE.text ("Saved, but failed to refresh the latest " <> what <> ". The values shown below may be out of date until you reload.") ]
 
 errorBanner :: Maybe String -> Html Message
 errorBanner = case _ of
