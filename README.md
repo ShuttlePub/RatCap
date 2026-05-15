@@ -12,24 +12,24 @@ bun install
 
 ## 開発
 
-`./scripts/dev.sh <mode>` で 3 つのモードを切り替えます。
+`./scripts/dev.sh [mode]` で 3 つのモードを切り替えます（省略時は `mock`）。
 
 | モード | 用途 | 認証 | 監視 | バンドル | COOKIE_SECRET |
 |--------|------|------|------|----------|---------------|
 | `mock` | フロント開発（既定） | 内蔵 mock | あり | 通常 spago bundle | 不要 |
 | `dev` | Kratos + Hydra 連携検証 | Kratos + Hydra + Emumet | あり | 通常 spago bundle | `scripts/.env.dev` に自動生成・永続化 |
-| `release` | 本番ビルド（成果物のみ） | Kratos + Hydra + Emumet | なし | purs-backend-es + esbuild --minify + tailwind --minify | 環境変数で**必須**（起動側で指定） |
+| `release` | 本番ビルド（成果物のみ） | Kratos + Hydra + Emumet | なし | purs-backend-es + esbuild --minify + tailwind --minify | **ビルド実行時に環境変数で必須**（成果物起動時にも使用） |
 
 ```bash
 ./scripts/dev.sh mock        # mock モードで dev サーバー起動
 ./scripts/dev.sh dev         # real モードで dev サーバー起動（自動で .env.dev を作成）
-./scripts/dev.sh release     # 最適化バンドルを dist/ に出力して終了
+COOKIE_SECRET_BASE64=$(openssl rand -base64 32) ./scripts/dev.sh release  # 最適化バンドルを dist/ に出力して終了
 ```
 
-`mock` / `dev` はファイル監視 + 自動再バンドル + Bun dev サーバーを一括で起動します。`release` は成果物の生成のみ行い、サーバーは起動しません。CI 用途です。`release` の成果物を起動するには別途以下を実行します。
+`mock` / `dev` はファイル監視 + 自動再バンドル + Bun dev サーバーを一括で起動します。`release` は `COOKIE_SECRET_BASE64` を環境変数で渡す必要があり（ビルド実行時にチェックします）、成果物の生成のみ行ってサーバーは起動しません。CI 用途です。`release` の成果物を起動する際にも別途 `COOKIE_SECRET_BASE64` を渡す必要があります（既存セッションを維持したい場合はビルド時と同じ値を、運用上問題なければ起動時に別途生成しても構いません）。
 
 ```bash
-COOKIE_SECRET_BASE64=$(openssl rand -base64 32) USE_MOCK=false bun index.ts
+COOKIE_SECRET_BASE64="$YOUR_PERSISTENT_SECRET" USE_MOCK=false bun index.ts
 ```
 
 ## 個別コマンド
@@ -50,11 +50,11 @@ bun index.ts               # サーバー起動（要事前ビルド）
 |--------|----------|--------|
 | Mock | `./scripts/dev.sh mock` | BFF 内蔵の mock auth |
 | Real (開発) | `./scripts/dev.sh dev` | Kratos + Hydra + Emumet |
-| Real (本番) | `./scripts/dev.sh release` で生成 → `COOKIE_SECRET_BASE64=... USE_MOCK=false bun index.ts` | Kratos + Hydra + Emumet |
+| Real (本番) | `COOKIE_SECRET_BASE64=... ./scripts/dev.sh release` で生成 → `COOKIE_SECRET_BASE64=... USE_MOCK=false bun index.ts` | Kratos + Hydra + Emumet |
 
 ### 環境変数
 
-`mock` モードではすべてデフォルト値で動作します。`dev` モードでは `./scripts/dev.sh dev` 初回実行時に `scripts/.env.dev` が自動生成され、以降の起動でも同じ `COOKIE_SECRET_BASE64` が再利用されます（git 管理外）。`release` 成果物の起動時は `COOKIE_SECRET_BASE64` を環境変数で**必ず**指定してください。
+`mock` モードではすべてデフォルト値で動作します。`dev` モードでは `./scripts/dev.sh dev` 初回実行時に `scripts/.env.dev` が自動生成され、以降の起動でも同じ `COOKIE_SECRET_BASE64` が再利用されます（git 管理外）。`release` モードはビルド実行時と成果物起動時の両方で `COOKIE_SECRET_BASE64` を環境変数として**必ず**指定してください（ビルド時にチェックされます）。
 
 #### 基本
 
@@ -78,7 +78,7 @@ bun index.ts               # サーバー起動（要事前ビルド）
 | `HYDRA_CLIENT_ID` | `ratcap-bff` | OAuth2 client ID |
 | `HYDRA_CLIENT_SECRET` | `dev-secret` | OAuth2 client secret |
 | `HYDRA_REDIRECT_URI` | `${APP_ORIGIN}/auth/callback` | OAuth2 callback URI |
-| `HYDRA_SCOPES` | `openid offline_access` | 要求スコープ |
+| `HYDRA_SCOPES` | `openid offline_access email` | 要求スコープ |
 | `HYDRA_AUDIENCE` | `account` | トークンの audience |
 
 #### Cookie / セッション
@@ -87,7 +87,7 @@ bun index.ts               # サーバー起動（要事前ビルド）
 |------|-----------|------|
 | `SESSION_COOKIE_NAME` | `ratcap_session` | セッション cookie 名 |
 | `OAUTH_COOKIE_NAME` | `ratcap_oauth` | OAuth state cookie 名 |
-| `COOKIE_SECRET_BASE64` | なし（**release 起動時必須** / `dev` は自動生成・永続化） | AES-GCM 暗号化キー（32 バイト、base64 エンコード） |
+| `COOKIE_SECRET_BASE64` | なし（**`release` ビルド時 / 起動時必須** / `dev` は自動生成・永続化） | AES-GCM 暗号化キー（32 バイト、base64 エンコード） |
 | `OAUTH_STATE_TTL_SECONDS` | `300`（5 分） | OAuth state の有効期限 |
 | `SESSION_REFRESH_SKEW_SECONDS` | `60`（1 分） | トークンの lazy refresh 開始マージン |
 
