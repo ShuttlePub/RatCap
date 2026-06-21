@@ -47,6 +47,8 @@
             esbuild
             watchexec
             openssl
+            pinact
+            zizmor
           ];
         };
       }
