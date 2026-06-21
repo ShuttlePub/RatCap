@@ -21,7 +21,7 @@ jobs:
       - uses: purescript-contrib/setup-purescript@main
         with:
           purescript: "0.15.15"
-          purs-tidy: "true"
+          purs-tidy: "latest"
 
       - uses: oven-sh/setup-bun@v2
         with:
