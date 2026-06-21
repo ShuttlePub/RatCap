@@ -58,11 +58,10 @@ accountsSection = case _ of
     HE.div [ HA.class' ("flex items-center gap-2 " <> T.textError) ]
       [ HE.text "Failed to load accounts." ]
   Loaded accs ->
-    if Array.null accs
-      then HE.div [ HA.class' ("text-center py-12 " <> T.textMuted) ]
-        [ HE.text "No accounts yet. Create one to get started." ]
-      else HE.div [ HA.class' "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" ]
-        (map accountCard accs)
+    if Array.null accs then HE.div [ HA.class' ("text-center py-12 " <> T.textMuted) ]
+      [ HE.text "No accounts yet. Create one to get started." ]
+    else HE.div [ HA.class' "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" ]
+      (map accountCard accs)
 
 accountCard :: AccountResponse -> Html Message
 accountCard (AccountResponse acc) =
@@ -78,10 +77,9 @@ accountCard (AccountResponse acc) =
                 ]
             ]
         , HE.div [ HA.class' ("mt-3 flex items-center gap-2 text-sm " <> T.textSecondary) ]
-            [ if acc.isBot
-                then HE.span [ HA.class' ("px-2 py-0.5 text-xs font-medium " <> T.bgAccent <> " text-white " <> T.roundedTheme) ]
-                  [ HE.text "Bot" ]
-                else HE.text ""
+            [ if acc.isBot then HE.span [ HA.class' ("px-2 py-0.5 text-xs font-medium " <> T.bgAccent <> " text-white " <> T.roundedTheme) ]
+                [ HE.text "Bot" ]
+              else HE.text ""
             , HE.span [ HA.class' T.textMuted ]
                 [ HE.text (formatDate acc.createdAt) ]
             ]

@@ -34,9 +34,10 @@ request req = do
   pure $ case result of
     Left err -> Left $ NetworkError (AX.printError err)
     Right response ->
-      let StatusCode code = response.status in
-      if code >= 200 && code < 300
-        then lmap (DecodeError <<< printJsonDecodeError) (decodeJson response.body)
+      let
+        StatusCode code = response.status
+      in
+        if code >= 200 && code < 300 then lmap (DecodeError <<< printJsonDecodeError) (decodeJson response.body)
         else Left $ HttpError code response.statusText
 
 -- | GET with JSON response
@@ -76,9 +77,10 @@ delete url = do
   pure $ case result of
     Left err -> Left $ NetworkError (AX.printError err)
     Right response ->
-      let StatusCode code = response.status in
-      if code >= 200 && code < 300
-        then Right unit
+      let
+        StatusCode code = response.status
+      in
+        if code >= 200 && code < 300 then Right unit
         else Left $ HttpError code response.statusText
 
 -- | PUT with JSON body and no response body (e.g. 204 No Content)
@@ -93,7 +95,8 @@ putUnit url body = do
   pure $ case result of
     Left err -> Left $ NetworkError (AX.printError err)
     Right response ->
-      let StatusCode code = response.status in
-      if code >= 200 && code < 300
-        then Right unit
+      let
+        StatusCode code = response.status
+      in
+        if code >= 200 && code < 300 then Right unit
         else Left $ HttpError code response.statusText

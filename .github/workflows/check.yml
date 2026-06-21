@@ -1,0 +1,41 @@
+name: Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purescript-contrib/setup-purescript@v2
+        with:
+          purescript: "0.15.15"
+          purs-tidy: "true"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - run: purs-tidy check src/ test/
+
+      - run: bunx spago build
+
+      - run: bunx spago test
+
+      - run: >-
+          mkdir -p dist && printf 'export function renderPage(...args: any[]): any;\n' > dist/server.d.ts
+
+      - run: bunx tsc --noEmit

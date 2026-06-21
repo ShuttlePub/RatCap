@@ -25,7 +25,6 @@ import Routing.Duplex (print)
 import Client.Navigation (_navigateToUrl)
 import Routing.PushState (PushStateInterface)
 
-
 -- | Get the current account ID from selectedAccount, if loaded
 currentAccountId :: Model -> Maybe String
 currentAccountId model = case model.selectedAccount of
@@ -35,9 +34,11 @@ currentAccountId model = case model.selectedAccount of
 mkUpdate :: PushStateInterface -> Update Model Message
 mkUpdate nav model = case _ of
   Navigate route ->
-    let url = print routeCodec route
-    in Tuple model
-      [ liftEffect (nav.pushState (unsafeToForeign {}) url) $> Nothing ]
+    let
+      url = print routeCodec route
+    in
+      Tuple model
+        [ liftEffect (nav.pushState (unsafeToForeign {}) url) $> Nothing ]
 
   UrlChanged mRoute ->
     if not model.isHydrated then noMessages $ model { isHydrated = true }
@@ -64,11 +65,13 @@ mkUpdate nav model = case _ of
             Just Login ->
               -- Redirect authenticated user away from login page
               if isJust model.session then
-                let homeBase = model { route = Just Home, page = pageForMaybeRoute (Just Home), editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false, accounts = Loading }
-                in Tuple homeBase
-                  [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
-                  , pure $ Just FetchAccounts
-                  ]
+                let
+                  homeBase = model { route = Just Home, page = pageForMaybeRoute (Just Home), editProfileForm = Nothing, editMetadataForm = Nothing, errorMessage = Nothing, savePending = false, accounts = Loading }
+                in
+                  Tuple homeBase
+                    [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
+                    , pure $ Just FetchAccounts
+                    ]
               else
                 noMessages $ base { loginForm = emptyLoginForm }
             _ -> noMessages base
@@ -94,11 +97,13 @@ mkUpdate nav model = case _ of
             _ -> noMessages m
         Just Login ->
           -- Authenticated user on login page → redirect to Home
-          let homeModel = m { route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
-          in Tuple homeModel
-            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
-            , pure $ Just FetchAccounts
-            ]
+          let
+            homeModel = m { route = Just Home, page = pageForMaybeRoute (Just Home), accounts = Loading }
+          in
+            Tuple homeModel
+              [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Home)) $> Nothing
+              , pure $ Just FetchAccounts
+              ]
         _ -> noMessages m
 
   SessionFailed ->
@@ -106,14 +111,14 @@ mkUpdate nav model = case _ of
     -- (e.g., startup CheckSession returns after successful LoginSuccess)
     if isJust model.session then noMessages model
     else
-    let
-      m = model { session = Nothing, savePending = false, editProfileForm = Nothing, editMetadataForm = Nothing }
-    in
-      case m.route of
-        Just r | isProtectedRoute r ->
-          Tuple (m { route = Just Login, page = pageForMaybeRoute (Just Login), loginForm = emptyLoginForm, errorMessage = Nothing })
-            [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
-        _ -> noMessages m
+      let
+        m = model { session = Nothing, savePending = false, editProfileForm = Nothing, editMetadataForm = Nothing }
+      in
+        case m.route of
+          Just r | isProtectedRoute r ->
+            Tuple (m { route = Just Login, page = pageForMaybeRoute (Just Login), loginForm = emptyLoginForm, errorMessage = Nothing })
+              [ liftEffect (nav.replaceState (unsafeToForeign {}) (print routeCodec Login)) $> Nothing ]
+          _ -> noMessages m
 
   SessionExpired ->
     -- API returned 401 — force re-login regardless of local session state
@@ -148,16 +153,14 @@ mkUpdate nav model = case _ of
     --   - Mock mode: 302 back to return_to (/) — session cookie already set
     --   - Real mode: redirect to Hydra OAuth2 flow → callback → session cookie → return_to
     -- Full page reload will trigger CheckSession to establish local session state.
-    if model.route == Just Login
-      then
-        Tuple (model { loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false })
-          [ liftEffect (_navigateToUrl "/auth/oauth/start?return_to=/") $> Nothing ]
-      else noMessages $ model { savePending = false }
+    if model.route == Just Login then
+      Tuple (model { loginForm = emptyLoginForm, errorMessage = Nothing, savePending = false })
+        [ liftEffect (_navigateToUrl "/auth/oauth/start?return_to=/") $> Nothing ]
+    else noMessages $ model { savePending = false }
 
   LoginFailed msg ->
-    if model.route == Just Login
-      then noMessages $ model { errorMessage = Just msg, savePending = false }
-      else noMessages $ model { savePending = false }
+    if model.route == Just Login then noMessages $ model { errorMessage = Just msg, savePending = false }
+    else noMessages $ model { savePending = false }
 
   Logout ->
     Tuple model [ logoutAff ]
@@ -175,14 +178,12 @@ mkUpdate nav model = case _ of
       [ fetchAccountsAff ]
 
   AccountsLoaded accs ->
-    if model.route == Just Home
-      then noMessages $ model { accounts = Loaded accs }
-      else noMessages model
+    if model.route == Just Home then noMessages $ model { accounts = Loaded accs }
+    else noMessages model
 
   AccountsFailed msg ->
-    if model.route == Just Home
-      then noMessages $ model { accounts = Failed, errorMessage = Just msg }
-      else noMessages model
+    if model.route == Just Home then noMessages $ model { accounts = Failed, errorMessage = Just msg }
+    else noMessages model
 
   -- Account detail: fetch account + profile + metadata (parallel)
   FetchAccountDetail id ->
@@ -190,14 +191,12 @@ mkUpdate nav model = case _ of
       [ fetchAccountDetailAff id ]
 
   AccountDetailLoaded id detail ->
-    if model.route == Just (AccountDetail id)
-      then noMessages $ model { selectedAccount = Loaded detail }
-      else noMessages model
+    if model.route == Just (AccountDetail id) then noMessages $ model { selectedAccount = Loaded detail }
+    else noMessages model
 
   AccountDetailFailed id msg ->
-    if model.route == Just (AccountDetail id)
-      then noMessages $ model { selectedAccount = Failed, errorMessage = Just msg }
-      else noMessages model
+    if model.route == Just (AccountDetail id) then noMessages $ model { selectedAccount = Failed, errorMessage = Just msg }
+    else noMessages model
 
   -- New account form
   SetNewAccountName name ->
@@ -218,18 +217,18 @@ mkUpdate nav model = case _ of
 
   AccountCreated (AccountResponse acc) ->
     -- Guard: only navigate if still on AccountNew page
-    if model.route == Just AccountNew
-      then
-        let url = print routeCodec (AccountDetail acc.id)
-        in Tuple (model { newAccountForm = emptyNewAccountForm, errorMessage = Nothing, savePending = false })
+    if model.route == Just AccountNew then
+      let
+        url = print routeCodec (AccountDetail acc.id)
+      in
+        Tuple (model { newAccountForm = emptyNewAccountForm, errorMessage = Nothing, savePending = false })
           [ liftEffect (nav.pushState (unsafeToForeign {}) url) $> Nothing ]
-      else noMessages $ model { savePending = false }
+    else noMessages $ model { savePending = false }
 
   AccountCreateFailed msg ->
     -- Guard: only show error if still on AccountNew page
-    if model.route == Just AccountNew
-      then noMessages $ model { errorMessage = Just msg, savePending = false }
-      else noMessages $ model { savePending = false }
+    if model.route == Just AccountNew then noMessages $ model { errorMessage = Just msg, savePending = false }
+    else noMessages $ model { savePending = false }
 
   -- Profile editing
   StartEditProfile ->
@@ -300,39 +299,36 @@ mkUpdate nav model = case _ of
   ProfileSaved gen accountId profile ->
     -- Only apply if this is the most recent in-flight save AND we're still viewing the same account
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then case model.selectedAccount of
-        Loaded d ->
-          noMessages $ model
-            { selectedAccount = Loaded (d { profile = Just profile, profileStale = false })
-            , editProfileForm = Nothing
-            , errorMessage = Nothing
-            , savePending = false
-            }
-        _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then case model.selectedAccount of
+      Loaded d ->
+        noMessages $ model
+          { selectedAccount = Loaded (d { profile = Just profile, profileStale = false })
+          , editProfileForm = Nothing
+          , errorMessage = Nothing
+          , savePending = false
+          }
+      _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
+    else noMessages $ model { savePending = false }
 
   ProfileSaveFailed gen accountId msg ->
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then noMessages $ model { errorMessage = Just msg, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then noMessages $ model { errorMessage = Just msg, savePending = false }
+    else noMessages $ model { savePending = false }
 
   ProfileSavedRefreshFailed gen accountId _refreshErr ->
     -- Save succeeded; only the follow-up re-fetch failed. Mark the profile as stale
     -- so the View renders a persistent banner until the user gets a fresh state.
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then case model.selectedAccount of
-        Loaded d ->
-          noMessages $ model
-            { selectedAccount = Loaded (d { profileStale = true })
-            , editProfileForm = Nothing
-            , savePending = false
-            , errorMessage = Nothing
-            }
-        _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then case model.selectedAccount of
+      Loaded d ->
+        noMessages $ model
+          { selectedAccount = Loaded (d { profileStale = true })
+          , editProfileForm = Nothing
+          , savePending = false
+          , errorMessage = Nothing
+          }
+      _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
+    else noMessages $ model { savePending = false }
 
   CancelEditProfile ->
     noMessages $ model { editProfileForm = Nothing, errorMessage = Nothing }
@@ -372,54 +368,53 @@ mkUpdate nav model = case _ of
           in
             if trimmedLabel == "" || trimmedContent == "" then noMessages model
             else
-              let AccountResponse acc = d.account
-              in Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
-                [ saveMetadataAff newGen acc.id form.id
-                    { label: trimmedLabel, content: trimmedContent }
-                ]
+              let
+                AccountResponse acc = d.account
+              in
+                Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
+                  [ saveMetadataAff newGen acc.id form.id
+                      { label: trimmedLabel, content: trimmedContent }
+                  ]
       _, _ -> noMessages model
 
   MetadataSaved gen accountId meta ->
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then case model.selectedAccount of
-        Loaded d ->
-          let
-            MetadataResponse m = meta
-            newMetadata = case findMetadata m.nanoid d.metadata of
-              Just _ -> map (\existing -> let MetadataResponse e = existing in if e.nanoid == m.nanoid then meta else existing) d.metadata
-              Nothing -> d.metadata <> [ meta ]
-          in
-            noMessages $ model
-              { selectedAccount = Loaded (d { metadata = newMetadata, metadataStale = false })
-              , editMetadataForm = Nothing
-              , errorMessage = Nothing
-              , savePending = false
-              }
-        _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then case model.selectedAccount of
+      Loaded d ->
+        let
+          MetadataResponse m = meta
+          newMetadata = case findMetadata m.nanoid d.metadata of
+            Just _ -> map (\existing -> let MetadataResponse e = existing in if e.nanoid == m.nanoid then meta else existing) d.metadata
+            Nothing -> d.metadata <> [ meta ]
+        in
+          noMessages $ model
+            { selectedAccount = Loaded (d { metadata = newMetadata, metadataStale = false })
+            , editMetadataForm = Nothing
+            , errorMessage = Nothing
+            , savePending = false
+            }
+      _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
+    else noMessages $ model { savePending = false }
 
   MetadataSaveFailed gen accountId msg ->
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then noMessages $ model { errorMessage = Just msg, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then noMessages $ model { errorMessage = Just msg, savePending = false }
+    else noMessages $ model { savePending = false }
 
   MetadataSavedRefreshFailed gen accountId _refreshErr ->
     -- Save succeeded; only the follow-up re-fetch failed (or returned list missing the item).
     -- Mark metadata as stale so the View renders a persistent banner.
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then case model.selectedAccount of
-        Loaded d ->
-          noMessages $ model
-            { selectedAccount = Loaded (d { metadataStale = true })
-            , editMetadataForm = Nothing
-            , savePending = false
-            , errorMessage = Nothing
-            }
-        _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then case model.selectedAccount of
+      Loaded d ->
+        noMessages $ model
+          { selectedAccount = Loaded (d { metadataStale = true })
+          , editMetadataForm = Nothing
+          , savePending = false
+          , errorMessage = Nothing
+          }
+      _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
+    else noMessages $ model { savePending = false }
 
   CancelMetadata ->
     noMessages $ model { editMetadataForm = Nothing, errorMessage = Nothing }
@@ -432,25 +427,26 @@ mkUpdate nav model = case _ of
           let
             AccountResponse acc = d.account
             newGen = model.saveGeneration + 1
-          in Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
-            [ deleteMetadataAff newGen acc.id nanoid ]
+          in
+            Tuple (model { errorMessage = Nothing, savePending = true, saveGeneration = newGen })
+              [ deleteMetadataAff newGen acc.id nanoid ]
       _ -> noMessages model
 
   MetadataDeleted gen accountId nanoid ->
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then case model.selectedAccount of
-        Loaded d ->
-          let newMetadata = filter (\(MetadataResponse m) -> m.nanoid /= nanoid) d.metadata
-          in noMessages $ model { selectedAccount = Loaded (d { metadata = newMetadata }), errorMessage = Nothing, savePending = false }
-        _ -> noMessages $ model { savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then case model.selectedAccount of
+      Loaded d ->
+        let
+          newMetadata = filter (\(MetadataResponse m) -> m.nanoid /= nanoid) d.metadata
+        in
+          noMessages $ model { selectedAccount = Loaded (d { metadata = newMetadata }), errorMessage = Nothing, savePending = false }
+      _ -> noMessages $ model { savePending = false }
+    else noMessages $ model { savePending = false }
 
   MetadataDeleteFailed gen accountId msg ->
     if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId
-      then noMessages $ model { errorMessage = Just msg, savePending = false }
-      else noMessages $ model { savePending = false }
+    else if currentAccountId model == Just accountId then noMessages $ model { errorMessage = Just msg, savePending = false }
+    else noMessages $ model { savePending = false }
 
 -- Helper: find metadata by nanoid
 findMetadata :: String -> Array MetadataResponse -> Maybe MetadataResponse
@@ -516,7 +512,8 @@ fetchAccountDetailAff id = do
               let
                 detail :: AccountWithDetails
                 detail = { account: acc, profile, metadata, profileStale: false, metadataStale: false }
-              in pure $ Just $ AccountDetailLoaded id detail
+              in
+                pure $ Just $ AccountDetailLoaded id detail
 
 submitNewAccountAff :: String -> Boolean -> Aff (Maybe Message)
 submitNewAccountAff name isBot = do

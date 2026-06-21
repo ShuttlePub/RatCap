@@ -107,10 +107,9 @@ profileHeader acc profile =
               [ HE.text displayName ]
           , HE.div [ HA.class' ("flex items-center gap-2 " <> T.textMuted) ]
               [ HE.text ("@" <> acc.name)
-              , if acc.isBot
-                  then HE.span [ HA.class' ("px-2 py-0.5 text-xs font-medium " <> T.bgAccent <> " text-white " <> T.roundedTheme) ]
-                    [ HE.text "Bot" ]
-                  else HE.text ""
+              , if acc.isBot then HE.span [ HA.class' ("px-2 py-0.5 text-xs font-medium " <> T.bgAccent <> " text-white " <> T.roundedTheme) ]
+                  [ HE.text "Bot" ]
+                else HE.text ""
               ]
           ]
       ]
@@ -231,9 +230,8 @@ metadataSection metadata editForm savePending =
                 ]
                 [ HE.text "+ Add" ]
         ]
-    , if Array.null metadata && editForm == Nothing
-        then HE.p [ HA.class' (T.textMuted <> " text-sm") ] [ HE.text "No metadata yet." ]
-        else HE.div [ HA.class' "space-y-2" ] (map (metadataRow editForm savePending) metadata)
+    , if Array.null metadata && editForm == Nothing then HE.p [ HA.class' (T.textMuted <> " text-sm") ] [ HE.text "No metadata yet." ]
+      else HE.div [ HA.class' "space-y-2" ] (map (metadataRow editForm savePending) metadata)
     , case editForm of
         Just form -> editMetadataSection form savePending
         Nothing -> HE.text ""
@@ -246,29 +244,28 @@ metadataRow editForm savePending (MetadataResponse m) =
       Just f -> f.id == Just m.nanoid
       Nothing -> false
   in
-    if isEditing
-      then HE.text "" -- Shown via editMetadataSection
-      else
-        HE.div [ HA.class' ("flex items-center gap-3 py-2 border-b last:border-0 " <> T.borderTheme) ]
-          [ HE.span [ HA.class' ("text-sm font-medium min-w-[100px] " <> T.textMuted) ]
-              [ HE.text m.label ]
-          , HE.span [ HA.class' ("text-sm flex-1 " <> T.textPrimary) ]
-              [ HE.text m.content ]
-          , HE.div [ HA.class' "flex gap-1 shrink-0" ]
-              [ HE.button
-                  [ HA.class' ("px-2 py-0.5 text-xs " <> T.textAccent <> " hover:opacity-80" <> if savePending then " opacity-50 cursor-not-allowed" else "")
-                  , HA.onClick (StartEditMetadata m.nanoid)
-                  , HA.disabled savePending
-                  ]
-                  [ HE.text "Edit" ]
-              , HE.button
-                  [ HA.class' ("px-2 py-0.5 text-xs " <> T.textError <> " hover:opacity-80" <> if savePending then " opacity-50 cursor-not-allowed" else "")
-                  , HA.onClick (DeleteMetadata m.nanoid)
-                  , HA.disabled savePending
-                  ]
-                  [ HE.text "Delete" ]
-              ]
-          ]
+    if isEditing then HE.text "" -- Shown via editMetadataSection
+    else
+      HE.div [ HA.class' ("flex items-center gap-3 py-2 border-b last:border-0 " <> T.borderTheme) ]
+        [ HE.span [ HA.class' ("text-sm font-medium min-w-[100px] " <> T.textMuted) ]
+            [ HE.text m.label ]
+        , HE.span [ HA.class' ("text-sm flex-1 " <> T.textPrimary) ]
+            [ HE.text m.content ]
+        , HE.div [ HA.class' "flex gap-1 shrink-0" ]
+            [ HE.button
+                [ HA.class' ("px-2 py-0.5 text-xs " <> T.textAccent <> " hover:opacity-80" <> if savePending then " opacity-50 cursor-not-allowed" else "")
+                , HA.onClick (StartEditMetadata m.nanoid)
+                , HA.disabled savePending
+                ]
+                [ HE.text "Edit" ]
+            , HE.button
+                [ HA.class' ("px-2 py-0.5 text-xs " <> T.textError <> " hover:opacity-80" <> if savePending then " opacity-50 cursor-not-allowed" else "")
+                , HA.onClick (DeleteMetadata m.nanoid)
+                , HA.disabled savePending
+                ]
+                [ HE.text "Delete" ]
+            ]
+        ]
 
 -- Metadata add/edit form (inline, shown below the list)
 editMetadataSection :: EditMetadataForm -> Boolean -> Html Message

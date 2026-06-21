@@ -7,10 +7,8 @@
     "@apidevtools/swagger-parser": "^12.1.0",
     "@types/bun": "latest",
     "@tailwindcss/cli": "^4.2.1",
+    "typescript": "^5",
     "spago": "^1.0.3",
     "tailwindcss": "^4.2.1"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
   }
 }

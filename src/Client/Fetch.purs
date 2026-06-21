@@ -46,11 +46,11 @@ request opts = fromEffectFnAff (_request opts)
 buildHeaders :: ClientConfig -> String -> Array { key :: String, value :: String }
 buildHeaders config contentType =
   let
-    base = [{ key: "Content-Type", value: contentType }]
+    base = [ { key: "Content-Type", value: contentType } ]
   in
     case config.bearerToken of
       Nothing -> base
-      Just token -> base <> [{ key: "Authorization", value: "Bearer " <> token }]
+      Just token -> base <> [ { key: "Authorization", value: "Bearer " <> token } ]
 
 requestJson
   :: forall req res

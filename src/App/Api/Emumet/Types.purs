@@ -23,12 +23,13 @@ newtype AccountResponse = AccountResponse
 
 instance EncodeJson AccountResponse where
   encodeJson (AccountResponse r) =
-    "created_at" := r.createdAt ~>
-    "id" := r.id ~>
-    "is_bot" := r.isBot ~>
-    "moderation" := r.moderation ~>
-    "name" := r.name ~>
-    "public_key" := r.publicKey ~> jsonEmptyObject
+    "created_at" := r.createdAt
+      ~> "id" := r.id
+      ~> "is_bot" := r.isBot
+      ~> "moderation" := r.moderation
+      ~> "name" := r.name
+      ~> "public_key" := r.publicKey
+      ~> jsonEmptyObject
 
 instance DecodeJson AccountResponse where
   decodeJson json = do
@@ -49,9 +50,10 @@ newtype AccountsResponse = AccountsResponse
 
 instance EncodeJson AccountsResponse where
   encodeJson (AccountsResponse r) =
-    "first" := r.first ~>
-    "items" := r.items ~>
-    "last" := r.last ~> jsonEmptyObject
+    "first" := r.first
+      ~> "items" := r.items
+      ~> "last" := r.last
+      ~> jsonEmptyObject
 
 instance DecodeJson AccountsResponse where
   decodeJson json = do
@@ -83,9 +85,10 @@ newtype ConsentDecision = ConsentDecision
 
 instance EncodeJson ConsentDecision where
   encodeJson (ConsentDecision r) =
-    "accept" := r.accept ~>
-    "consent_challenge" := r.consentChallenge ~>
-    "grant_scope" := r.grantScope ~> jsonEmptyObject
+    "accept" := r.accept
+      ~> "consent_challenge" := r.consentChallenge
+      ~> "grant_scope" := r.grantScope
+      ~> jsonEmptyObject
 
 instance DecodeJson ConsentDecision where
   decodeJson json = do
@@ -102,8 +105,9 @@ newtype CreateAccountRequest = CreateAccountRequest
 
 instance EncodeJson CreateAccountRequest where
   encodeJson (CreateAccountRequest r) =
-    "is_bot" := r.isBot ~>
-    "name" := r.name ~> jsonEmptyObject
+    "is_bot" := r.isBot
+      ~> "name" := r.name
+      ~> jsonEmptyObject
 
 instance DecodeJson CreateAccountRequest where
   decodeJson json = do
@@ -119,8 +123,9 @@ newtype CreateMetadataRequest = CreateMetadataRequest
 
 instance EncodeJson CreateMetadataRequest where
   encodeJson (CreateMetadataRequest r) =
-    "content" := r.content ~>
-    "label" := r.label ~> jsonEmptyObject
+    "content" := r.content
+      ~> "label" := r.label
+      ~> jsonEmptyObject
 
 instance DecodeJson CreateMetadataRequest where
   decodeJson json = do
@@ -163,10 +168,11 @@ newtype MetadataResponse = MetadataResponse
 
 instance EncodeJson MetadataResponse where
   encodeJson (MetadataResponse r) =
-    "account_id" := r.accountId ~>
-    "content" := r.content ~>
-    "label" := r.label ~>
-    "nanoid" := r.nanoid ~> jsonEmptyObject
+    "account_id" := r.accountId
+      ~> "content" := r.content
+      ~> "label" := r.label
+      ~> "nanoid" := r.nanoid
+      ~> jsonEmptyObject
 
 instance DecodeJson MetadataResponse where
   decodeJson json = do
@@ -179,25 +185,27 @@ instance DecodeJson MetadataResponse where
 
 data ModerationResponse
   = ModerationResponseSuspended
-    { expiresAt :: (Maybe String)
-    , reason :: String
-    , suspendedAt :: String
-    }
+      { expiresAt :: (Maybe String)
+      , reason :: String
+      , suspendedAt :: String
+      }
   | ModerationResponseBanned
-    { bannedAt :: String
-    , reason :: String
-    }
+      { bannedAt :: String
+      , reason :: String
+      }
 
 instance EncodeJson ModerationResponse where
   encodeJson (ModerationResponseSuspended r) =
-    "type" := "suspended" ~>
-    "expires_at" := r.expiresAt ~>
-    "reason" := r.reason ~>
-    "suspended_at" := r.suspendedAt ~> jsonEmptyObject
+    "type" := "suspended"
+      ~> "expires_at" := r.expiresAt
+      ~> "reason" := r.reason
+      ~> "suspended_at" := r.suspendedAt
+      ~> jsonEmptyObject
   encodeJson (ModerationResponseBanned r) =
-    "type" := "banned" ~>
-    "banned_at" := r.bannedAt ~>
-    "reason" := r.reason ~> jsonEmptyObject
+    "type" := "banned"
+      ~> "banned_at" := r.bannedAt
+      ~> "reason" := r.reason
+      ~> jsonEmptyObject
 
 instance DecodeJson ModerationResponse where
   decodeJson json = do
@@ -217,23 +225,25 @@ instance DecodeJson ModerationResponse where
 
 data OAuth2Response
   = OAuth2ResponseRedirect
-    { redirectTo :: String
-    }
+      { redirectTo :: String
+      }
   | OAuth2ResponseShowConsent
-    { clientName :: (Maybe String)
-    , consentChallenge :: String
-    , requestedScope :: (Array String)
-    }
+      { clientName :: (Maybe String)
+      , consentChallenge :: String
+      , requestedScope :: (Array String)
+      }
 
 instance EncodeJson OAuth2Response where
   encodeJson (OAuth2ResponseRedirect r) =
-    "action" := "redirect" ~>
-    "redirect_to" := r.redirectTo ~> jsonEmptyObject
+    "action" := "redirect"
+      ~> "redirect_to" := r.redirectTo
+      ~> jsonEmptyObject
   encodeJson (OAuth2ResponseShowConsent r) =
-    "action" := "show_consent" ~>
-    "client_name" := r.clientName ~>
-    "consent_challenge" := r.consentChallenge ~>
-    "requested_scope" := r.requestedScope ~> jsonEmptyObject
+    "action" := "show_consent"
+      ~> "client_name" := r.clientName
+      ~> "consent_challenge" := r.consentChallenge
+      ~> "requested_scope" := r.requestedScope
+      ~> jsonEmptyObject
 
 instance DecodeJson OAuth2Response where
   decodeJson json = do
@@ -261,12 +271,13 @@ newtype ProfileResponse = ProfileResponse
 
 instance EncodeJson ProfileResponse where
   encodeJson (ProfileResponse r) =
-    "account_id" := r.accountId ~>
-    "banner_url" := r.bannerUrl ~>
-    "display_name" := r.displayName ~>
-    "icon_url" := r.iconUrl ~>
-    "nanoid" := r.nanoid ~>
-    "summary" := r.summary ~> jsonEmptyObject
+    "account_id" := r.accountId
+      ~> "banner_url" := r.bannerUrl
+      ~> "display_name" := r.displayName
+      ~> "icon_url" := r.iconUrl
+      ~> "nanoid" := r.nanoid
+      ~> "summary" := r.summary
+      ~> jsonEmptyObject
 
 instance DecodeJson ProfileResponse where
   decodeJson json = do
@@ -319,8 +330,9 @@ newtype UpdateMetadataRequest = UpdateMetadataRequest
 
 instance EncodeJson UpdateMetadataRequest where
   encodeJson (UpdateMetadataRequest r) =
-    "content" := r.content ~>
-    "label" := r.label ~> jsonEmptyObject
+    "content" := r.content
+      ~> "label" := r.label
+      ~> jsonEmptyObject
 
 instance DecodeJson UpdateMetadataRequest where
   decodeJson json = do
