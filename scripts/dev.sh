@@ -151,7 +151,7 @@ watchexec \
    spago bundle --platform node --module Server --outfile dist/server.js --bundle-type module" &
 CHILD_PIDS+=($!)
 
-bunx @tailwindcss/cli -i src/style.css -o dist/style.css --watch &
+bunx @tailwindcss/cli -i src/style.css -o dist/style.css --watch=always &
 CHILD_PIDS+=($!)
 
 # Only `bun index.ts` receives COOKIE_SECRET_BASE64. The watch + tailwind processes
