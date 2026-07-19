@@ -1,0 +1,88 @@
+// ============================================================
+// GraphQL リゾルバ — Query / Mutation / Account フィールド
+// データ取得は必ず context.emumet (EmumetClient) 経由とし、
+// リゾルバ層から直接 fetch しない。
+// エラー写像: 未認証 → UNAUTHENTICATED / EmumetNotFoundError → NOT_FOUND / 他 → INTERNAL_SERVER_ERROR
+// ============================================================
+
+import { GraphQLError } from "graphql";
+import type {
+  Account,
+  CreateAccountInput,
+  EmumetClient,
+  MetadataInput,
+  ProfileFields,
+} from "./emumet/client.ts";
+import { EmumetNotFoundError } from "./emumet/client.ts";
+import type { GraphQLContext } from "./context.ts";
+
+/** リゾルバ入口の認証ガード。未認証 (emumet 非注入) なら UNAUTHENTICATED を投げる */
+export function requireEmumet(context: GraphQLContext): EmumetClient {
+  if (!context.emumet) {
+    throw new GraphQLError("Unauthenticated", { extensions: { code: "UNAUTHENTICATED" } });
+  }
+  return context.emumet;
+}
+
+function toGraphQLError(error: unknown): GraphQLError {
+  if (error instanceof GraphQLError) return error;
+  if (error instanceof EmumetNotFoundError) {
+    return new GraphQLError(error.message, { extensions: { code: "NOT_FOUND" }, originalError: error });
+  }
+  return new GraphQLError("Internal server error", {
+    extensions: { code: "INTERNAL_SERVER_ERROR" },
+    originalError: error instanceof Error ? error : undefined,
+  });
+}
+
+/** EmumetClient 呼び出しを包み、ドメインエラーを GraphQL エラーコードに写像する */
+async function withEmumetErrors<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    throw toGraphQLError(error);
+  }
+}
+
+export const resolvers = {
+  Query: {
+    accounts: (_parent: unknown, _args: unknown, context: GraphQLContext) =>
+      withEmumetErrors(() => requireEmumet(context).listAccounts()),
+    account: (_parent: unknown, args: { id: string }, context: GraphQLContext) =>
+      withEmumetErrors(() => requireEmumet(context).getAccount(args.id)),
+  },
+  Account: {
+    profile: (parent: Account, _args: unknown, context: GraphQLContext) =>
+      context.makeLoaders().profile.load(parent.id),
+    metadata: (parent: Account, _args: unknown, context: GraphQLContext) =>
+      context.makeLoaders().metadata.load(parent.id),
+  },
+  Mutation: {
+    createAccount: (_parent: unknown, args: { input: CreateAccountInput }, context: GraphQLContext) =>
+      withEmumetErrors(() => requireEmumet(context).createAccount(args.input)),
+    updateProfile: (
+      _parent: unknown,
+      args: { accountId: string; input: ProfileFields },
+      context: GraphQLContext,
+    ) => withEmumetErrors(() => requireEmumet(context).upsertProfile(args.accountId, args.input)),
+    createMetadata: (
+      _parent: unknown,
+      args: { accountId: string; input: MetadataInput },
+      context: GraphQLContext,
+    ) => withEmumetErrors(() => requireEmumet(context).createMetadata(args.accountId, args.input)),
+    updateMetadata: (
+      _parent: unknown,
+      args: { accountId: string; nanoid: string; input: MetadataInput },
+      context: GraphQLContext,
+    ) =>
+      withEmumetErrors(() => requireEmumet(context).updateMetadata(args.accountId, args.nanoid, args.input)),
+    deleteMetadata: async (
+      _parent: unknown,
+      args: { accountId: string; nanoid: string },
+      context: GraphQLContext,
+    ) => {
+      await withEmumetErrors(() => requireEmumet(context).deleteMetadata(args.accountId, args.nanoid));
+      return true;
+    },
+  },
+};
