@@ -1,4 +1,21 @@
 import { renderPage } from "./dist/server.js";
+import {
+  sealCookie,
+  unsealCookie,
+  base64UrlEncode,
+  base64UrlDecode,
+  getCookieValue,
+  setCookieHeader,
+  clearCookieHeader,
+  getMockSession,
+  getRealSession,
+  setRealSessionCookie,
+  refreshAccessToken,
+  isSessionExpiringSoon,
+  encodeMockCookie,
+  type AppSession,
+  type MockSession,
+} from "./bff/session.ts";
 
 // ============================================================
 // Configuration
@@ -32,77 +49,8 @@ const SESSION_REFRESH_SKEW_SECONDS = Number(process.env.SESSION_REFRESH_SKEW_SEC
 const IS_SECURE_ORIGIN = APP_ORIGIN.startsWith("https://");
 
 // ============================================================
-// AES-GCM Cookie Encryption (real mode)
-// ============================================================
-
-let _cookieKey: CryptoKey | null = null;
-
-async function getCookieKey(): Promise<CryptoKey> {
-  if (_cookieKey) return _cookieKey;
-  if (!COOKIE_SECRET_BASE64) throw new Error("COOKIE_SECRET_BASE64 is required in real mode");
-  const raw = Uint8Array.from(atob(COOKIE_SECRET_BASE64), c => c.charCodeAt(0));
-  if (raw.length !== 32) throw new Error("COOKIE_SECRET_BASE64 must decode to exactly 32 bytes");
-  _cookieKey = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
-  return _cookieKey;
-}
-
-/** Encrypt JSON-serializable data → base64url string (iv:ciphertext) */
-async function sealCookie<T>(data: T): Promise<string> {
-  const key = await getCookieKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plaintext = new TextEncoder().encode(JSON.stringify(data));
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext));
-  // Concatenate iv + ciphertext, encode as base64url
-  const combined = new Uint8Array(iv.length + ciphertext.length);
-  combined.set(iv);
-  combined.set(ciphertext, iv.length);
-  const encoded = base64UrlEncode(combined);
-  console.log("sealCookie: plaintext length:", plaintext.length, "combined length:", combined.length, "encoded length:", encoded.length);
-  return encoded;
-}
-
-/** Decrypt base64url string → parsed JSON, or null on failure */
-async function unsealCookie<T>(value: string): Promise<T | null> {
-  try {
-    const key = await getCookieKey();
-    const combined = base64UrlDecode(value);
-    console.log("unsealCookie: input length:", value.length, "decoded length:", combined.length);
-    if (combined.length < 13) return null; // 12-byte IV + at least 1 byte
-    const iv = combined.slice(0, 12);
-    const ciphertext = combined.slice(12);
-    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-    return JSON.parse(new TextDecoder().decode(plaintext)) as T;
-  } catch (err) {
-    console.error("unsealCookie failed:", err);
-    return null;
-  }
-}
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlDecode(str: string): Uint8Array {
-  const padded = str.replace(/-/g, "+").replace(/_/g, "/") + "==".slice(0, (4 - str.length % 4) % 4);
-  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
-}
-
-// ============================================================
 // Cookie helpers (mock: base64 JSON, real: AES-GCM)
 // ============================================================
-
-type AppSession = {
-  v: 1;
-  sub?: string;
-  email?: string;
-  name?: string;
-  accessToken: string;
-  refreshToken?: string;
-  tokenType: "Bearer";
-  scope: string;
-  expiresAt: number; // Unix timestamp
-};
 
 type PendingOAuth = {
   v: 1;
@@ -112,46 +60,12 @@ type PendingOAuth = {
   expiresAt: number; // Unix timestamp
 };
 
-// Mock session (simple base64 JSON — NOT encrypted)
-type MockSession = { token: string; username: string };
-
-function encodeMockCookie(data: MockSession): string {
-  return btoa(JSON.stringify(data));
-}
-function decodeMockCookie(value: string): MockSession | null {
-  try {
-    const parsed = JSON.parse(atob(value));
-    if (typeof parsed.token === "string" && typeof parsed.username === "string") return parsed;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function getCookieValue(req: Request, name: string): string | null {
-  const cookieHeader = req.headers.get("cookie");
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? match[1]! : null;
-}
-
-function setCookieHeader(name: string, value: string, opts: { maxAge?: number; path?: string } = {}): string {
-  const parts = [`${name}=${value}`, `Path=${opts.path || "/"}`, "HttpOnly", "SameSite=Lax"];
-  if (IS_SECURE_ORIGIN) parts.push("Secure");
-  if (opts.maxAge !== undefined) parts.push(`Max-Age=${opts.maxAge}`);
-  return parts.join("; ");
-}
-
 /** Validate return_to as a safe relative path (no open redirect) */
 function safeReturnTo(input: string | null): string {
   const raw = input || "/";
   // Must start with "/" and must NOT start with "//" or "/\" (protocol-relative or backslash tricks)
   if (/^\/(?![/\\])/.test(raw)) return raw;
   return "/";
-}
-
-function clearCookieHeader(name: string): string {
-  return setCookieHeader(name, "", { maxAge: 0 });
 }
 
 // --- Mock mode session helpers ---
@@ -161,21 +75,8 @@ function setMockSessionCookie(headers: Headers, data: MockSession): void {
 function clearMockSessionCookie(headers: Headers): void {
   headers.append("Set-Cookie", clearCookieHeader(SESSION_COOKIE_NAME));
 }
-function getMockSession(req: Request): MockSession | null {
-  const value = getCookieValue(req, SESSION_COOKIE_NAME);
-  return value ? decodeMockCookie(value) : null;
-}
 
 // --- Real mode session helpers ---
-async function setRealSessionCookie(headers: Headers, session: AppSession): Promise<void> {
-  const sealed = await sealCookie(session);
-  headers.append("Set-Cookie", setCookieHeader(SESSION_COOKIE_NAME, sealed));
-}
-async function getRealSession(req: Request): Promise<AppSession | null> {
-  const value = getCookieValue(req, SESSION_COOKIE_NAME);
-  if (!value) return null;
-  return unsealCookie<AppSession>(value);
-}
 async function setOAuthCookie(headers: Headers, data: PendingOAuth): Promise<void> {
   const sealed = await sealCookie(data);
   headers.append("Set-Cookie", setCookieHeader(OAUTH_COOKIE_NAME, sealed, { maxAge: OAUTH_STATE_TTL_SECONDS }));
@@ -244,48 +145,6 @@ function randomBase64Url(bytes: number): string {
 async function pkceChallenge(verifier: string): Promise<string> {
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
   return base64UrlEncode(new Uint8Array(hash));
-}
-
-// ============================================================
-// Token refresh
-// ============================================================
-
-async function refreshAccessToken(session: AppSession): Promise<AppSession | null> {
-  if (!session.refreshToken) return null;
-  try {
-    const resp = await fetch(`${HYDRA_PUBLIC_URL}/oauth2/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": "Basic " + btoa(`${HYDRA_CLIENT_ID}:${HYDRA_CLIENT_SECRET}`),
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: session.refreshToken,
-      }),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in: number;
-      scope: string;
-      token_type: string;
-    };
-    return {
-      ...session,
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || session.refreshToken,
-      scope: data.scope,
-      expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function isSessionExpiringSoon(session: AppSession): boolean {
-  return session.expiresAt - Math.floor(Date.now() / 1000) < SESSION_REFRESH_SKEW_SECONDS;
 }
 
 // ============================================================
