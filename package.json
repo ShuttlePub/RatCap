@@ -7,6 +7,7 @@
     "@apidevtools/swagger-parser": "^12.1.0",
     "@tailwindcss/cli": "^4.2.1",
     "@types/bun": "latest",
+    "purescript-graphql-client": "^10.1.1",
     "spago": "^1.0.3",
     "tailwindcss": "^4.2.1",
     "typescript": "^5"
