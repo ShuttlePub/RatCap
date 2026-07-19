@@ -13,9 +13,15 @@ import {
   refreshAccessToken,
   isSessionExpiringSoon,
   encodeMockCookie,
+  createSessionAdapter,
+  createMockSessionAdapter,
   type AppSession,
   type MockSession,
 } from "./bff/session.ts";
+import { createYogaHandler } from "./bff/server.ts";
+import { createMockEmumetClient } from "./bff/emumet/mock.ts";
+import { createRealEmumetClient } from "./bff/emumet/real.ts";
+import type { SessionAdapter } from "./bff/session.ts";
 
 // ============================================================
 // Configuration
@@ -924,12 +930,37 @@ if (!USE_MOCK) {
   }
 }
 
+// GraphQL BFF (bff/): SessionAdapter は USE_MOCK に応じて切替。
+// Mock: base64 MockSession を解決 + プロセス共有の MockEmumetClient (token 無視)。
+// Real: AES-GCM AppSession + Hydra refresh + token から RealEmumetClient を生成。
+const sessionAdapter: SessionAdapter<{ accessToken: string }> = USE_MOCK
+  ? createMockSessionAdapter()
+  : createSessionAdapter({
+      cookieSecretBase64: COOKIE_SECRET_BASE64!,
+      sessionCookieName: SESSION_COOKIE_NAME,
+      isSecureOrigin: IS_SECURE_ORIGIN,
+      hydraPublicUrl: HYDRA_PUBLIC_URL,
+      hydraClientId: HYDRA_CLIENT_ID,
+      hydraClientSecret: HYDRA_CLIENT_SECRET,
+      refreshSkewSeconds: SESSION_REFRESH_SKEW_SECONDS,
+    });
+const sharedMockEmumetClient = USE_MOCK ? createMockEmumetClient() : null;
+const yogaHandler = createYogaHandler(
+  sessionAdapter,
+  sharedMockEmumetClient
+    ? () => sharedMockEmumetClient
+    : (token) => createRealEmumetClient({ baseUrl: EMUMET_API_URL }, token),
+);
+
 Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
 
     const staticResponse = serveStatic(url.pathname);
     if (staticResponse) return staticResponse;
+
+    // GraphQL BFF endpoint
+    if (url.pathname === "/graphql") return yogaHandler(req);
 
     // Auth endpoints (BFF)
     if (url.pathname.startsWith("/auth/")) {
