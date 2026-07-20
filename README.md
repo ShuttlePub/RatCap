@@ -37,12 +37,14 @@ COOKIE_SECRET_BASE64="$YOUR_PERSISTENT_SECRET" USE_MOCK=false bun index.ts
 ```bash
 spago build                # ビルド
 spago test                 # テスト
+bun test                   # BFF テスト (bff/ 配下の Jest テスト)
 bun index.ts               # サーバー起動（要事前ビルド）
+bun scripts/sync-graphql.ts  # SDL → PureScript 型生成 (bff/schema.graphql 変更時)
 ```
 
 ## 認証
 
-`index.ts` は BFF (Backend-for-Frontend) パターンで認証を処理します。Mock モードと Real モード (Kratos + Hydra) の 2 つの動作モードがあります。
+`index.ts` は BFF (Backend-for-Frontend) パターンで認証とデータ API を処理します。データ API は graphql-yoga を使った `/graphql` エンドポイントで提供され、GraphQL クライアントは PureScript 側で `graphql-client` ライブラリを使います。認証は引き続き REST のままです (`/auth/*` エンドポイント)。Mock モードと Real モード (Kratos + Hydra) の 2 つの動作モードがあります。
 
 ### 起動モード
 
@@ -113,3 +115,13 @@ bun scripts/register-hydra-client.ts
 
 - **メールアドレス**: 任意の文字列
 - **パスワード**: `password`
+
+### GraphQL の型再生成
+
+SDL スキーマ (`bff/schema.graphql`) を変更した場合、PureScript 側の型を再生成する必要があります。
+
+```bash
+bun scripts/sync-graphql.ts
+```
+
+`src/Generated/` 配下の型が再生成されます。生成物は git で管理 (コミット) する運用です。`--schema <path>` フラグで別の SDL ファイルを指定することもできます。

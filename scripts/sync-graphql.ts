@@ -13,9 +13,8 @@
  *   4. stops the server (try/finally — no orphan listeners).
  *
  * Flags:
- *   --generate-only  No-op accepted for symmetry with scripts/sync-api.ts.
- *                    This script is inherently generate-only: it always reads
- *                    the local SDL, there is nothing to fetch.
+ *   --generate-only  No-op flag. This script is inherently generate-only:
+ *                    it always reads the local SDL, there is nothing to fetch.
  *   --schema <path>  SDL file to read (default: bff/schema.graphql).
  *                    Used by QA to point at a broken copy without touching
  *                    the real schema.

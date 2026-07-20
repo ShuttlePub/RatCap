@@ -1,5 +1,5 @@
 // ============================================================
-// RealEmumetClient — Emumet REST API 実装 (openapi/emumet.json 準拠)
+// RealEmumetClient — Emumet REST API 実装 (REST 契約に準拠)
 // ワイヤ形式は snake_case、DTO (client.ts) は camelCase。境界で相互変換する。
 // ============================================================
 

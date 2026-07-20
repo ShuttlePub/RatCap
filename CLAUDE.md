@@ -18,6 +18,8 @@ Development tools are managed via Nix flake + direnv. Entering the project direc
 - **Bundle server:** `spago bundle --platform node --module Server --outfile dist/server.js --bundle-type module`
 - **Bundle CSS:** `bunx @tailwindcss/cli -i src/style.css -o dist/style.css`
 - **Run tests:** `spago test`
+- **BFF tests:** `bun test`
+- **GraphQL codegen:** `bun scripts/sync-graphql.ts` (regenerate PureScript types from `bff/schema.graphql`)
 - **Install JS dependencies:** `bun install`
 
 ## Architecture
@@ -27,17 +29,32 @@ Development tools are managed via Nix flake + direnv. Entering the project direc
 - **SSR:** `Server.purs` renders full HTML via `Flame.Renderer.String`, with serialized state embedded in `<template-state>` for hydration
 - **Client:** `Client.purs` hydrates SSR HTML via `Flame.resumeMount`, then handles client-side routing with `matchesWith`
 - **Styling:** Tailwind CSS v4 — utility classes applied directly via `HA.class'` in PureScript views; `src/style.css` is the entry point with `@source "../src/**/*.purs"` to scan PureScript files for class names
-- **Auth (BFF):** `index.ts` implements BFF (Backend-for-Frontend) auth — mock mode (built-in) and real mode (Kratos + Hydra OAuth2 PKCE). Session is stored in an AES-GCM encrypted HttpOnly cookie (`ratcap_session`). `/api/*` proxy injects Bearer token from session cookie.
-- **Dev server:** `index.ts` — Bun.serve() handles SSR (all routes), static files (`/app.js`, `/style.css`), auth endpoints (`/auth/*`), and API proxy (`/api/*`)
+- **Auth (BFF):** `index.ts` implements BFF (Backend-for-Frontend) auth — mock mode (built-in) and real mode (Kratos + Hydra OAuth2 PKCE). Session is stored in an AES-GCM encrypted HttpOnly cookie (`ratcap_session`).
+- **Data API (BFF):** `bff/server.ts` serves `/graphql` via graphql-yoga. The schema is defined in `bff/schema.graphql` (single source of truth), with resolvers in `bff/resolvers.ts`. Session resolution happens in `bff/context.ts` via `SessionAdapter` DI. DataLoaders in `bff/loaders.ts` batch Emumet API calls per request. Errors use `extensions.code` (UNAUTHENTICATED / NOT_FOUND / INTERNAL_SERVER_ERROR). Set-Cookie via WeakMap + yoga onResponse plugin.
+- **Dev server:** `index.ts` — Bun.serve() handles SSR (all routes), static files (`/app.js`, `/style.css`), auth endpoints (`/auth/*`), and GraphQL (`/graphql`)
 - **Dev script:** `scripts/dev.sh` — triple bundle (client + server + CSS) + watchexec (auto-rebuild on `.purs` changes) + Tailwind `--watch` + Bun dev server
-- **PureScript packages:** managed by `spago.yaml`, uses registry package set
+- **PureScript packages:** managed by `spago.yaml`, uses registry package set (includes `graphql-client` for /graphql queries)
 - **JS dependencies:** managed by `package.json` / `bun.lock`
 
 ### Module Structure
 
 ```
+bff/
+  schema.graphql           -- GraphQL SDL (single source of truth for the data API)
+  schema.ts                -- SDL loader + makeExecutableSchema
+  server.ts                -- Yoga handler: createYogaHandler(adapter, createEmumetClient)
+  context.ts               -- Session resolution + auth context (SessionAdapter DI)
+  session.ts               -- Session foundation: seal/unseal, cookie helpers, refresh, SessionAdapter interface
+  loaders.ts               -- DataLoader: profile + metadata, request-scoped, memoized per request
+  resolvers.ts             -- Query/Mutation resolvers
+  emumet/
+    client.ts              -- EmumetClient interface + DTOs (camelCase)
+    real.ts                -- REST-backed EmumetClient (snake_case ↔ camelCase mapping)
+    mock.ts                -- In-memory stateful MockEmumetClient
+  *.test.ts                -- BFF test files (bun test)
 src/
   style.css               -- Tailwind CSS entry point (@import "tailwindcss" + @source)
+  Generated/               -- Auto-generated PureScript GraphQL types (from bff/schema.graphql via sync-graphql.ts; never hand-edit)
   App/
     Route.purs            -- Route ADT (Home, Settings, AccountNew, AccountDetail, Login) + routing-duplex codec
     Model.purs            -- Model type (Maybe Route, PageModel, SessionInfo, isHydrated) + JSON instances
@@ -46,10 +63,9 @@ src/
     Api/
       Client.purs         -- Generic HTTP client (Affjax-based: get, post, put, delete)
       Auth.purs           -- Auth API calls (login, checkSession, logout) via BFF /auth/* endpoints
-      Emumet/
-        Client.purs       -- Emumet API wrappers over Api.Client
-        Types.purs        -- Auto-generated Emumet API types (DO NOT EDIT)
-        Tristate.purs     -- Tristate type for optional update fields
+      GraphQL.purs        -- GraphQL client (graphql-client): queries + mutations over /graphql
+      GraphQL/
+        Types.purs        -- App-owned stable DTOs (AccountResponse, ProfileResponse, etc.)
     View/
       Layout.purs         -- HTML shell (<html>/<head>/<body>) + auth-aware navigation
       Login.purs          -- Login page view (email + password form)
@@ -72,9 +88,7 @@ src/
 scripts/
   dev.sh                  -- Dev server (build + watch + serve)
   register-hydra-client.ts -- Register OAuth2 client in Hydra (real mode setup)
-  fetch-openapi.ts        -- Fetch OpenAPI spec from Emumet
-  generate-api.ts         -- Generate PureScript types from OpenAPI spec
-  sync-api.ts             -- Sync API types (fetch + generate)
+  sync-graphql.ts         -- Generate PureScript types from bff/schema.graphql (SDL → introspection → src/Generated/)
 ```
 
 ### Key Design Decisions
