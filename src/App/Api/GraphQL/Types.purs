@@ -10,7 +10,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Foreign.Object as FO
 
--- Response DTOs (same names/shapes as src/App/Api/Emumet/Types.purs)
+-- Response DTOs (app-owned stable DTOs, decoupled from the BFF schema)
 
 newtype AccountResponse = AccountResponse
   { createdAt :: String
