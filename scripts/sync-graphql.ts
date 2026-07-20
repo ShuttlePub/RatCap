@@ -136,9 +136,17 @@ async function main(): Promise<void> {
       console.error(`  wrote ${path}`);
     }
     await dropConflictingDateTimeImport("./src/Generated/Schema/Gql.purs");
+
+    console.error("=== Step 4: Formatting generated files ===");
+    const formatProc = Bun.spawnSync(["bunx", "purs-tidy", "format-in-place", "./src/Generated"]);
+    if (formatProc.exitCode !== 0) {
+      console.error(`purs-tidy failed (exit ${formatProc.exitCode}):\n${formatProc.stderr.toString()}`);
+      process.exit(formatProc.exitCode);
+    }
+    console.error("  formatted src/Generated/ with purs-tidy");
   } finally {
     server.stop(true);
-    console.error("=== Step 4: Temporary server stopped ===");
+    console.error("=== Step 5: Temporary server stopped ===");
   }
 
   console.error("Done. Generated files are in src/Generated/");

@@ -13,13 +13,11 @@ import GraphQL.Client.ToGqlString (class GqlArgString)
 import GraphQL.Hasura.Decode (class DecodeHasura)
 import GraphQL.Hasura.Encode (class EncodeHasura)
 
-
-data ModerationType 
+data ModerationType
   = SUSPENDED
   | BANNED
 
-
-instance eqModerationType :: Eq ModerationType where 
+instance eqModerationType :: Eq ModerationType where
   eq = eq `on` show
 
 instance ordModerationType :: Ord ModerationType where
@@ -29,31 +27,31 @@ instance gqlArgStringModerationType :: GqlArgString ModerationType where
   toGqlArgStringImpl = show
 
 instance decodeJsonModerationType :: DecodeJson ModerationType where
-  decodeJson = decodeJson >=> case _ of 
+  decodeJson = decodeJson >=> case _ of
     "SUSPENDED" -> pure SUSPENDED
     "BANNED" -> pure BANNED
     s -> Left $ TypeMismatch $ "Not a ModerationType: " <> s
 
-instance encodeJsonModerationType :: EncodeJson ModerationType where 
+instance encodeJsonModerationType :: EncodeJson ModerationType where
   encodeJson = show >>> encodeJson
 
-instance decdoeHasuraModerationType :: DecodeHasura ModerationType where 
+instance decdoeHasuraModerationType :: DecodeHasura ModerationType where
   decodeHasura = decodeJson
 
-instance encodeHasuraModerationType :: EncodeHasura ModerationType where 
+instance encodeHasuraModerationType :: EncodeHasura ModerationType where
   encodeHasura = encodeJson
 
 instance showModerationType :: Show ModerationType where
-  show a = case a of 
+  show a = case a of
     SUSPENDED -> "SUSPENDED"
     BANNED -> "BANNED"
 
 instance enumModerationType :: Enum ModerationType where
-  succ a = case a of 
+  succ a = case a of
     SUSPENDED -> Just BANNED
     BANNED -> Nothing
-  pred a = case a of 
-    SUSPENDED -> Nothing 
+  pred a = case a of
+    SUSPENDED -> Nothing
     BANNED -> Just SUSPENDED
 
 instance boundedModerationType :: Bounded ModerationType where

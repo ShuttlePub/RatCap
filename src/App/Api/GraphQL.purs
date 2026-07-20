@@ -95,14 +95,16 @@ safeDecodeData json decodeData =
 -- | Check if a JSON errors array contains an entry with a specific extensions.code.
 anyErrorHasCode :: String -> Array Json -> Boolean
 anyErrorHasCode target errs =
-  any (\e -> case decodeJson e of
-    Right obj -> case obj .: "extensions" of
-      Right exts -> case exts .: "code" of
-        Right code -> code == target
+  any
+    ( \e -> case decodeJson e of
+        Right obj -> case obj .: "extensions" of
+          Right exts -> case exts .: "code" of
+            Right code -> code == target
+            _ -> false
+          _ -> false
         _ -> false
-      _ -> false
-    _ -> false
-  ) errs
+    )
+    errs
 
 -- | Unwrap GraphQL ID to String.
 unwrapId :: ID -> String
@@ -170,12 +172,12 @@ fetchAccounts = do
   result <- try $ queryFullRes decodeJson identity queryClient "FetchAccounts"
     { accounts: {} `Args`
         { items:
-          { id: unit
-          , name: unit
-          , isBot: unit
-          , publicKey: unit
-          , createdAt: unit
-          }
+            { id: unit
+            , name: unit
+            , isBot: unit
+            , publicKey: unit
+            , createdAt: unit
+            }
         , first: unit
         , last: unit
         }
@@ -210,35 +212,35 @@ fetchAccountDetail :: String -> Aff (Either ApiError AccountDetailResult)
 fetchAccountDetail accountId = do
   result <- try $ queryJson identity queryClient "FetchAccountDetail"
     { account:
-      { id: ID accountId }
-      `Args`
-        { id: unit
-        , name: unit
-        , isBot: unit
-        , publicKey: unit
-        , createdAt: unit
-        , moderation:
-          { type: unit
-          , reason: unit
-          , suspendedAt: unit
-          , expiresAt: unit
-          , bannedAt: unit
-          }
-        , profile:
-          { nanoid: unit
-          , accountId: unit
-          , displayName: unit
-          , summary: unit
-          , iconUrl: unit
-          , bannerUrl: unit
-          }
-        , metadata:
-          { nanoid: unit
-          , accountId: unit
-          , label: unit
-          , content: unit
-          }
-        }
+        { id: ID accountId }
+          `Args`
+            { id: unit
+            , name: unit
+            , isBot: unit
+            , publicKey: unit
+            , createdAt: unit
+            , moderation:
+                { type: unit
+                , reason: unit
+                , suspendedAt: unit
+                , expiresAt: unit
+                , bannedAt: unit
+                }
+            , profile:
+                { nanoid: unit
+                , accountId: unit
+                , displayName: unit
+                , summary: unit
+                , iconUrl: unit
+                , bannerUrl: unit
+                }
+            , metadata:
+                { nanoid: unit
+                , accountId: unit
+                , label: unit
+                , content: unit
+                }
+            }
     }
   pure $ case result of
     Left affErr -> Left (NetworkError (message affErr))
@@ -290,14 +292,14 @@ createAccount :: String -> Boolean -> Aff (Either ApiError AccountResponse)
 createAccount name isBot = do
   result <- try $ mutationJson identity mutationClient "CreateAccount"
     { createAccount:
-      { input: { name, isBot: isBot } }
-      `Args`
-        { id: unit
-        , name: unit
-        , isBot: unit
-        , publicKey: unit
-        , createdAt: unit
-        }
+        { input: { name, isBot: isBot } }
+          `Args`
+            { id: unit
+            , name: unit
+            , isBot: unit
+            , publicKey: unit
+            , createdAt: unit
+            }
     }
   pure $ case result of
     Left affErr -> Left (NetworkError (message affErr))
@@ -321,24 +323,25 @@ createAccount name isBot = do
 updateProfile :: String -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Either ApiError ProfileResponse)
 updateProfile accountId fields = do
   let
-    input = { displayName: tristateMaybe fields.displayName
-            , summary: tristateMaybe fields.summary
-            , iconUrl: tristateMaybe fields.iconUrl
-            , bannerUrl: tristateMaybe fields.bannerUrl
-            }
+    input =
+      { displayName: tristateMaybe fields.displayName
+      , summary: tristateMaybe fields.summary
+      , iconUrl: tristateMaybe fields.iconUrl
+      , bannerUrl: tristateMaybe fields.bannerUrl
+      }
   result <- try $ mutationJson identity mutationClient "UpdateProfile"
     { updateProfile:
-      { accountId: ID accountId
-      , input: input
-      }
-      `Args`
-        { nanoid: unit
-        , accountId: unit
-        , displayName: unit
-        , summary: unit
-        , iconUrl: unit
-        , bannerUrl: unit
+        { accountId: ID accountId
+        , input: input
         }
+          `Args`
+            { nanoid: unit
+            , accountId: unit
+            , displayName: unit
+            , summary: unit
+            , iconUrl: unit
+            , bannerUrl: unit
+            }
     }
   pure $ case result of
     Left affErr -> Left (NetworkError (message affErr))
@@ -368,15 +371,15 @@ createMetadata :: String -> { label :: String, content :: String } -> Aff (Eithe
 createMetadata accountId { label, content } = do
   result <- try $ mutationJson identity mutationClient "CreateMetadata"
     { createMetadata:
-      { accountId: ID accountId
-      , input: { label, content }
-      }
-      `Args`
-        { nanoid: unit
-        , accountId: unit
-        , label: unit
-        , content: unit
+        { accountId: ID accountId
+        , input: { label, content }
         }
+          `Args`
+            { nanoid: unit
+            , accountId: unit
+            , label: unit
+            , content: unit
+            }
     }
   pure $ case result of
     Left affErr -> Left (NetworkError (message affErr))
@@ -399,16 +402,16 @@ updateMetadata :: String -> String -> { label :: String, content :: String } -> 
 updateMetadata accountId nanoid { label, content } = do
   result <- try $ mutationJson identity mutationClient "UpdateMetadata"
     { updateMetadata:
-      { accountId: ID accountId
-      , nanoid: ID nanoid
-      , input: { label, content }
-      }
-      `Args`
-        { nanoid: unit
-        , accountId: unit
-        , label: unit
-        , content: unit
+        { accountId: ID accountId
+        , nanoid: ID nanoid
+        , input: { label, content }
         }
+          `Args`
+            { nanoid: unit
+            , accountId: unit
+            , label: unit
+            , content: unit
+            }
     }
   pure $ case result of
     Left affErr -> Left (NetworkError (message affErr))
@@ -431,9 +434,9 @@ deleteMetadata :: String -> String -> Aff (Either ApiError Unit)
 deleteMetadata accountId nanoid = do
   result <- try $ mutationJson identity mutationClient "DeleteMetadata"
     { deleteMetadata:
-      { accountId: ID accountId
-      , nanoid: ID nanoid
-      } `Args` unit
+        { accountId: ID accountId
+        , nanoid: ID nanoid
+        } `Args` unit
     }
   pure $ case result of
     Left affErr -> Left (NetworkError (message affErr))
