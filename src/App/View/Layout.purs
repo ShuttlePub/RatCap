@@ -70,7 +70,9 @@ document content =
         ]
     ]
 
+-- | Served as a static file (src/theme.js) because Flame's renderer HTML-escapes
+-- | HE.text payloads, and <script> content is raw text where entities are not
+-- | decoded — inlining would turn every `'` into `&#39;` and break the script.
 themeInitScript :: Html Message
 themeInitScript =
-  HE.script_
-    [ HE.text "(function(){var d=document.documentElement,c=localStorage.getItem('ratcap-color')||'catppuccin-mocha',s=localStorage.getItem('ratcap-shape')||'rounded';d.setAttribute('data-color',c);d.setAttribute('data-shape',s);var bg={'catppuccin-mocha':'#1e1e2e','tokyo-night':'#1a1b26'};d.style.backgroundColor=bg[c]||bg['catppuccin-mocha'];})()" ]
+  HE.script [ HA.src "/theme.js" ] []
