@@ -9,7 +9,7 @@ import { makeSchema } from "./schema.ts";
 import { resolvers } from "./resolvers.ts";
 import { buildContext, type GraphQLContext } from "./context.ts";
 import { createMockEmumetClient } from "./emumet/mock.ts";
-import type { EmumetClient } from "./emumet/client.ts";
+import { EmumetApiError, type EmumetClient } from "./emumet/client.ts";
 import type { SessionAdapter } from "./session.ts";
 
 const schema: GraphQLSchema = makeSchema(resolvers);
@@ -230,5 +230,39 @@ describe("(b) UNAUTHENTICATED branch", () => {
     // Then
     expect(result.data).toBeNull();
     expect(result.errors?.[0]?.extensions?.code).toBe("UNAUTHENTICATED");
+  });
+});
+
+describe("(c) nested field loader error sanitization", () => {
+  test("Account.profile sanitizes EmumetApiError to INTERNAL_SERVER_ERROR", async () => {
+    // Given: client whose listProfiles throws EmumetApiError with an upstream body
+    const throwingClient: EmumetClient = {
+      ...createMockEmumetClient(),
+      listProfiles: () => Promise.reject(new EmumetApiError(500, "SECRET-UPSTREAM-BODY")),
+    };
+    const context = await authenticatedContext(throwingClient);
+    // When: query with profile sub-field (triggers Account.profile resolver)
+    const result = await run('{ account(id: "acc_01") { id profile { nanoid } } }', context);
+    // Then: secret body must NOT leak, code must be INTERNAL_SERVER_ERROR
+    expect(result.errors).toBeDefined();
+    expect(result.errors?.[0]?.message).not.toContain("SECRET-UPSTREAM-BODY");
+    expect(result.errors?.[0]?.message).toBe("Internal server error");
+    expect(result.errors?.[0]?.extensions?.code).toBe("INTERNAL_SERVER_ERROR");
+  });
+
+  test("Account.metadata sanitizes EmumetApiError to INTERNAL_SERVER_ERROR", async () => {
+    // Given: client whose listMetadata throws EmumetApiError with an upstream body
+    const throwingClient: EmumetClient = {
+      ...createMockEmumetClient(),
+      listMetadata: () => Promise.reject(new EmumetApiError(500, "SECRET-UPSTREAM-BODY")),
+    };
+    const context = await authenticatedContext(throwingClient);
+    // When: query with metadata sub-field (triggers Account.metadata resolver)
+    const result = await run('{ account(id: "acc_01") { id metadata { nanoid } } }', context);
+    // Then: secret body must NOT leak, code must be INTERNAL_SERVER_ERROR
+    expect(result.errors).toBeDefined();
+    expect(result.errors?.[0]?.message).not.toContain("SECRET-UPSTREAM-BODY");
+    expect(result.errors?.[0]?.message).toBe("Internal server error");
+    expect(result.errors?.[0]?.extensions?.code).toBe("INTERNAL_SERVER_ERROR");
   });
 });

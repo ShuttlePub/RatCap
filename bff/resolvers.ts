@@ -53,9 +53,9 @@ export const resolvers = {
   },
   Account: {
     profile: (parent: Account, _args: unknown, context: GraphQLContext) =>
-      context.makeLoaders().profile.load(parent.id),
+      withEmumetErrors(() => context.makeLoaders().profile.load(parent.id)),
     metadata: (parent: Account, _args: unknown, context: GraphQLContext) =>
-      context.makeLoaders().metadata.load(parent.id),
+      withEmumetErrors(() => context.makeLoaders().metadata.load(parent.id)),
   },
   Mutation: {
     createAccount: (_parent: unknown, args: { input: CreateAccountInput }, context: GraphQLContext) =>
