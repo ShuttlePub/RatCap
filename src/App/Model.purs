@@ -2,7 +2,7 @@ module App.Model where
 
 import Prelude
 
-import App.Api.Emumet.Types (AccountResponse, MetadataResponse, ProfileResponse)
+import App.Api.GraphQL.Types (AccountResponse, MetadataResponse, ProfileResponse)
 import App.Route (Route)
 import App.Route as Route
 import Data.Argonaut.Decode (class DecodeJson)
@@ -37,8 +37,6 @@ type AccountWithDetails =
   { account :: AccountResponse
   , profile :: Maybe ProfileResponse
   , metadata :: Array MetadataResponse
-  , profileStale :: Boolean
-  , metadataStale :: Boolean
   }
 
 -- Session info from BFF (GET /auth/session)

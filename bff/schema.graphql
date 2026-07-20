@@ -1,0 +1,77 @@
+scalar DateTime
+
+type Account {
+  id: ID!
+  name: String!
+  isBot: Boolean!
+  publicKey: String!
+  createdAt: DateTime!
+  moderation: Moderation
+  profile: Profile
+  metadata: [Metadata!]!
+}
+
+enum ModerationType {
+  SUSPENDED
+  BANNED
+}
+
+type Moderation {
+  type: ModerationType!
+  reason: String!
+  suspendedAt: DateTime
+  expiresAt: DateTime
+  bannedAt: DateTime
+}
+
+type Profile {
+  nanoid: ID!
+  accountId: ID!
+  displayName: String
+  summary: String
+  iconUrl: String
+  bannerUrl: String
+}
+
+type Metadata {
+  nanoid: ID!
+  accountId: ID!
+  label: String!
+  content: String!
+}
+
+type AccountConnection {
+  items: [Account!]!
+  first: String
+  last: String
+}
+
+input CreateAccountInput {
+  name: String!
+  isBot: Boolean
+}
+
+input UpdateProfileInput {
+  displayName: String
+  summary: String
+  iconUrl: String
+  bannerUrl: String
+}
+
+input UpsertMetadataInput {
+  label: String!
+  content: String!
+}
+
+type Query {
+  accounts: AccountConnection!
+  account(id: ID!): Account
+}
+
+type Mutation {
+  createAccount(input: CreateAccountInput!): Account!
+  updateProfile(accountId: ID!, input: UpdateProfileInput!): Profile!
+  createMetadata(accountId: ID!, input: UpsertMetadataInput!): Metadata!
+  updateMetadata(accountId: ID!, nanoid: ID!, input: UpsertMetadataInput!): Metadata!
+  deleteMetadata(accountId: ID!, nanoid: ID!): Boolean!
+}

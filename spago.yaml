@@ -16,6 +16,7 @@ package:
     - foldable-traversable
     - foreign
     - foreign-object
+    - graphql-client
     - http-methods
     - maybe
     - parallel
@@ -30,5 +31,5 @@ package:
     dependencies: []
 workspace:
   packageSet:
-    registry: 73.3.0
+    registry: 77.7.0
   extraPackages: {}

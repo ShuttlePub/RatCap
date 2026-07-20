@@ -5,10 +5,17 @@
   "private": true,
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
-    "@types/bun": "latest",
     "@tailwindcss/cli": "^4.2.1",
-    "typescript": "^5",
+    "@types/bun": "latest",
+    "purescript-graphql-client": "^10.1.1",
     "spago": "^1.0.3",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@graphql-tools/schema": "^10.0.38",
+    "dataloader": "^2.2.3",
+    "graphql": "^16",
+    "graphql-yoga": "^5.21.2"
   }
 }

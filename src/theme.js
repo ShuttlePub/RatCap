@@ -1,0 +1,1 @@
+(function(){var d=document.documentElement,c=localStorage.getItem('ratcap-color')||'catppuccin-mocha',s=localStorage.getItem('ratcap-shape')||'rounded';d.setAttribute('data-color',c);d.setAttribute('data-shape',s);var bg={'catppuccin-mocha':'#1e1e2e','tokyo-night':'#1a1b26'};d.style.backgroundColor=bg[c]||bg['catppuccin-mocha'];})()

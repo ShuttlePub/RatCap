@@ -1,4 +1,27 @@
 import { renderPage } from "./dist/server.js";
+import {
+  sealCookie,
+  unsealCookie,
+  base64UrlEncode,
+  base64UrlDecode,
+  getCookieValue,
+  setCookieHeader,
+  clearCookieHeader,
+  getMockSession,
+  getRealSession,
+  setRealSessionCookie,
+  refreshAccessToken,
+  isSessionExpiringSoon,
+  encodeMockCookie,
+  createSessionAdapter,
+  createMockSessionAdapter,
+  type AppSession,
+  type MockSession,
+} from "./bff/session.ts";
+import { createYogaHandler } from "./bff/server.ts";
+import { createMockEmumetClient } from "./bff/emumet/mock.ts";
+import { createRealEmumetClient } from "./bff/emumet/real.ts";
+import type { SessionAdapter } from "./bff/session.ts";
 
 // ============================================================
 // Configuration
@@ -32,77 +55,8 @@ const SESSION_REFRESH_SKEW_SECONDS = Number(process.env.SESSION_REFRESH_SKEW_SEC
 const IS_SECURE_ORIGIN = APP_ORIGIN.startsWith("https://");
 
 // ============================================================
-// AES-GCM Cookie Encryption (real mode)
-// ============================================================
-
-let _cookieKey: CryptoKey | null = null;
-
-async function getCookieKey(): Promise<CryptoKey> {
-  if (_cookieKey) return _cookieKey;
-  if (!COOKIE_SECRET_BASE64) throw new Error("COOKIE_SECRET_BASE64 is required in real mode");
-  const raw = Uint8Array.from(atob(COOKIE_SECRET_BASE64), c => c.charCodeAt(0));
-  if (raw.length !== 32) throw new Error("COOKIE_SECRET_BASE64 must decode to exactly 32 bytes");
-  _cookieKey = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
-  return _cookieKey;
-}
-
-/** Encrypt JSON-serializable data → base64url string (iv:ciphertext) */
-async function sealCookie<T>(data: T): Promise<string> {
-  const key = await getCookieKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plaintext = new TextEncoder().encode(JSON.stringify(data));
-  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext));
-  // Concatenate iv + ciphertext, encode as base64url
-  const combined = new Uint8Array(iv.length + ciphertext.length);
-  combined.set(iv);
-  combined.set(ciphertext, iv.length);
-  const encoded = base64UrlEncode(combined);
-  console.log("sealCookie: plaintext length:", plaintext.length, "combined length:", combined.length, "encoded length:", encoded.length);
-  return encoded;
-}
-
-/** Decrypt base64url string → parsed JSON, or null on failure */
-async function unsealCookie<T>(value: string): Promise<T | null> {
-  try {
-    const key = await getCookieKey();
-    const combined = base64UrlDecode(value);
-    console.log("unsealCookie: input length:", value.length, "decoded length:", combined.length);
-    if (combined.length < 13) return null; // 12-byte IV + at least 1 byte
-    const iv = combined.slice(0, 12);
-    const ciphertext = combined.slice(12);
-    const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-    return JSON.parse(new TextDecoder().decode(plaintext)) as T;
-  } catch (err) {
-    console.error("unsealCookie failed:", err);
-    return null;
-  }
-}
-
-function base64UrlEncode(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlDecode(str: string): Uint8Array {
-  const padded = str.replace(/-/g, "+").replace(/_/g, "/") + "==".slice(0, (4 - str.length % 4) % 4);
-  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
-}
-
-// ============================================================
 // Cookie helpers (mock: base64 JSON, real: AES-GCM)
 // ============================================================
-
-type AppSession = {
-  v: 1;
-  sub?: string;
-  email?: string;
-  name?: string;
-  accessToken: string;
-  refreshToken?: string;
-  tokenType: "Bearer";
-  scope: string;
-  expiresAt: number; // Unix timestamp
-};
 
 type PendingOAuth = {
   v: 1;
@@ -112,46 +66,12 @@ type PendingOAuth = {
   expiresAt: number; // Unix timestamp
 };
 
-// Mock session (simple base64 JSON — NOT encrypted)
-type MockSession = { token: string; username: string };
-
-function encodeMockCookie(data: MockSession): string {
-  return btoa(JSON.stringify(data));
-}
-function decodeMockCookie(value: string): MockSession | null {
-  try {
-    const parsed = JSON.parse(atob(value));
-    if (typeof parsed.token === "string" && typeof parsed.username === "string") return parsed;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function getCookieValue(req: Request, name: string): string | null {
-  const cookieHeader = req.headers.get("cookie");
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? match[1]! : null;
-}
-
-function setCookieHeader(name: string, value: string, opts: { maxAge?: number; path?: string } = {}): string {
-  const parts = [`${name}=${value}`, `Path=${opts.path || "/"}`, "HttpOnly", "SameSite=Lax"];
-  if (IS_SECURE_ORIGIN) parts.push("Secure");
-  if (opts.maxAge !== undefined) parts.push(`Max-Age=${opts.maxAge}`);
-  return parts.join("; ");
-}
-
 /** Validate return_to as a safe relative path (no open redirect) */
 function safeReturnTo(input: string | null): string {
   const raw = input || "/";
   // Must start with "/" and must NOT start with "//" or "/\" (protocol-relative or backslash tricks)
   if (/^\/(?![/\\])/.test(raw)) return raw;
   return "/";
-}
-
-function clearCookieHeader(name: string): string {
-  return setCookieHeader(name, "", { maxAge: 0 });
 }
 
 // --- Mock mode session helpers ---
@@ -161,21 +81,8 @@ function setMockSessionCookie(headers: Headers, data: MockSession): void {
 function clearMockSessionCookie(headers: Headers): void {
   headers.append("Set-Cookie", clearCookieHeader(SESSION_COOKIE_NAME));
 }
-function getMockSession(req: Request): MockSession | null {
-  const value = getCookieValue(req, SESSION_COOKIE_NAME);
-  return value ? decodeMockCookie(value) : null;
-}
 
 // --- Real mode session helpers ---
-async function setRealSessionCookie(headers: Headers, session: AppSession): Promise<void> {
-  const sealed = await sealCookie(session);
-  headers.append("Set-Cookie", setCookieHeader(SESSION_COOKIE_NAME, sealed));
-}
-async function getRealSession(req: Request): Promise<AppSession | null> {
-  const value = getCookieValue(req, SESSION_COOKIE_NAME);
-  if (!value) return null;
-  return unsealCookie<AppSession>(value);
-}
 async function setOAuthCookie(headers: Headers, data: PendingOAuth): Promise<void> {
   const sealed = await sealCookie(data);
   headers.append("Set-Cookie", setCookieHeader(OAUTH_COOKIE_NAME, sealed, { maxAge: OAUTH_STATE_TTL_SECONDS }));
@@ -247,54 +154,13 @@ async function pkceChallenge(verifier: string): Promise<string> {
 }
 
 // ============================================================
-// Token refresh
-// ============================================================
-
-async function refreshAccessToken(session: AppSession): Promise<AppSession | null> {
-  if (!session.refreshToken) return null;
-  try {
-    const resp = await fetch(`${HYDRA_PUBLIC_URL}/oauth2/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": "Basic " + btoa(`${HYDRA_CLIENT_ID}:${HYDRA_CLIENT_SECRET}`),
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: session.refreshToken,
-      }),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in: number;
-      scope: string;
-      token_type: string;
-    };
-    return {
-      ...session,
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || session.refreshToken,
-      scope: data.scope,
-      expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function isSessionExpiringSoon(session: AppSession): boolean {
-  return session.expiresAt - Math.floor(Date.now() / 1000) < SESSION_REFRESH_SKEW_SECONDS;
-}
-
-// ============================================================
 // Static files
 // ============================================================
 
 const staticFiles: Record<string, { path: string; contentType: string }> = {
   "/app.js": { path: "dist/app.js", contentType: "application/javascript" },
   "/style.css": { path: "dist/style.css", contentType: "text/css" },
+  "/theme.js": { path: "src/theme.js", contentType: "application/javascript" },
 };
 
 function serveStatic(pathname: string): Response | null {
@@ -304,58 +170,6 @@ function serveStatic(pathname: string): Response | null {
     headers: { "Content-Type": entry.contentType },
   });
 }
-
-// ============================================================
-// Mock data store
-// ============================================================
-
-interface MockAccount {
-  id: string;
-  name: string;
-  is_bot: boolean;
-  public_key: string;
-  created_at: string;
-  moderation: null;
-}
-
-interface MockProfile {
-  account_id: string;
-  nanoid: string;
-  display_name: string | null;
-  summary: string | null;
-  icon_url: string | null;
-  banner_url: string | null;
-}
-
-interface MockMetadata {
-  account_id: string;
-  nanoid: string;
-  label: string;
-  content: string;
-}
-
-let mockNextId = 100;
-function nextId(): string {
-  return String(mockNextId++);
-}
-
-const mockAccounts: MockAccount[] = [
-  { id: "acc_01", name: "alice", is_bot: false, public_key: "ed25519:AAAA", created_at: "2025-01-15T09:00:00Z", moderation: null },
-  { id: "acc_02", name: "bob", is_bot: false, public_key: "ed25519:BBBB", created_at: "2025-02-20T14:30:00Z", moderation: null },
-  { id: "acc_03", name: "bot-news", is_bot: true, public_key: "ed25519:CCCC", created_at: "2025-03-10T00:00:00Z", moderation: null },
-];
-
-const mockProfiles: MockProfile[] = [
-  { account_id: "acc_01", nanoid: "prof_01", display_name: "Alice Wonderland", summary: "Exploring the rabbit hole of federated social networks.", icon_url: "https://api.dicebear.com/9.x/thumbs/svg?seed=alice", banner_url: "https://picsum.photos/seed/alice/800/200" },
-  { account_id: "acc_02", nanoid: "prof_02", display_name: "Bob Builder", summary: "Can we fix it? Yes we can!", icon_url: "https://api.dicebear.com/9.x/thumbs/svg?seed=bob", banner_url: null },
-  { account_id: "acc_03", nanoid: "prof_03", display_name: "News Bot", summary: "Automated news aggregator.", icon_url: "https://api.dicebear.com/9.x/thumbs/svg?seed=bot", banner_url: null },
-];
-
-const mockMetadata: MockMetadata[] = [
-  { account_id: "acc_01", nanoid: "meta_01", label: "Website", content: "https://alice.example.com" },
-  { account_id: "acc_01", nanoid: "meta_02", label: "Pronouns", content: "she/her" },
-  { account_id: "acc_02", nanoid: "meta_03", label: "GitHub", content: "https://github.com/bob" },
-];
 
 // ============================================================
 // Mock Auth handlers (BFF /auth/* endpoints)
@@ -800,235 +614,6 @@ async function handleRealAuth(req: Request, pathname: string): Promise<Response 
 }
 
 // ============================================================
-// Mock API handlers
-// ============================================================
-
-async function handleMockApi(req: Request, pathname: string): Promise<Response> {
-  // Enforce session authentication
-  const session = getMockSession(req);
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const method = req.method;
-
-  // GET /api/accounts
-  if (method === "GET" && pathname === "/api/accounts") {
-    return Response.json({ items: mockAccounts, first: null, last: null });
-  }
-
-  // POST /api/accounts
-  if (method === "POST" && pathname === "/api/accounts") {
-    const data = await req.json() as { name: string; is_bot?: boolean };
-    const id = "acc_" + nextId();
-    const acc: MockAccount = {
-      id,
-      name: data.name,
-      is_bot: data.is_bot ?? false,
-      public_key: "ed25519:MOCK_" + id,
-      created_at: new Date().toISOString(),
-      moderation: null,
-    };
-    mockAccounts.push(acc);
-    return Response.json(acc, { status: 201 });
-  }
-
-  // GET /api/accounts/:id
-  const accountMatch = pathname.match(/^\/api\/accounts\/([^/]+)$/);
-  if (method === "GET" && accountMatch) {
-    const accId = accountMatch[1]!;
-    const acc = mockAccounts.find(a => a.id === accId);
-    return acc ? Response.json(acc) : Response.json({ error: "not found" }, { status: 404 });
-  }
-
-  // Profile routes: /api/accounts/:id/profile
-  const profileMatch = pathname.match(/^\/api\/accounts\/([^/]+)\/profile$/);
-  if (profileMatch) {
-    const accountId = profileMatch[1]!;
-
-    if (method === "GET") {
-      const profile = mockProfiles.find(p => p.account_id === accountId);
-      return profile ? Response.json(profile) : Response.json({ error: "not found" }, { status: 404 });
-    }
-
-    if (method === "POST") {
-      const data = await req.json() as Record<string, unknown>;
-      const existingIdx = mockProfiles.findIndex(p => p.account_id === accountId);
-      const profile: MockProfile = {
-        account_id: accountId,
-        nanoid: existingIdx >= 0 ? mockProfiles[existingIdx]!.nanoid : "prof_" + nextId(),
-        display_name: resolveTristateField(data, "display_name"),
-        summary: resolveTristateField(data, "summary"),
-        icon_url: resolveTristateField(data, "icon_url"),
-        banner_url: resolveTristateField(data, "banner_url"),
-      };
-      if (existingIdx >= 0) {
-        mockProfiles[existingIdx] = profile;
-      } else {
-        mockProfiles.push(profile);
-      }
-      return Response.json(profile, { status: 201 });
-    }
-
-    if (method === "PUT") {
-      const data = await req.json() as Record<string, unknown>;
-      const idx = mockProfiles.findIndex(p => p.account_id === accountId);
-      if (idx < 0) return Response.json({ error: "not found" }, { status: 404 });
-      const existing = mockProfiles[idx]!;
-      mockProfiles[idx] = {
-        account_id: existing.account_id,
-        nanoid: existing.nanoid,
-        display_name: resolveTristateUpdate(data, "display_name", existing.display_name),
-        summary: resolveTristateUpdate(data, "summary", existing.summary),
-        icon_url: resolveTristateUpdate(data, "icon_url", existing.icon_url),
-        banner_url: resolveTristateUpdate(data, "banner_url", existing.banner_url),
-      };
-      return Response.json(mockProfiles[idx]);
-    }
-  }
-
-  // GET /api/metadata?account_ids=...
-  if (method === "GET" && pathname.startsWith("/api/metadata")) {
-    const url = new URL(req.url);
-    const accountIds = url.searchParams.get("account_ids")?.split(",") ?? [];
-    const metas = mockMetadata.filter(m => accountIds.includes(m.account_id));
-    return Response.json(metas);
-  }
-
-  // Metadata routes with nanoid: /api/accounts/:id/metadata/:nanoid
-  const metadataWithIdMatch = pathname.match(/^\/api\/accounts\/([^/]+)\/metadata\/([^/]+)$/);
-  if (metadataWithIdMatch) {
-    const accountId = metadataWithIdMatch[1]!;
-    const nanoid = metadataWithIdMatch[2]!;
-
-    if (method === "PUT") {
-      const data = await req.json() as { label: string; content: string };
-      const idx = mockMetadata.findIndex(m => m.account_id === accountId && m.nanoid === nanoid);
-      if (idx < 0) return Response.json({ error: "not found" }, { status: 404 });
-      mockMetadata[idx] = { account_id: accountId, nanoid, label: data.label, content: data.content };
-      return Response.json(mockMetadata[idx]);
-    }
-
-    if (method === "DELETE") {
-      const idx = mockMetadata.findIndex(m => m.account_id === accountId && m.nanoid === nanoid);
-      if (idx < 0) return Response.json({ error: "not found" }, { status: 404 });
-      mockMetadata.splice(idx, 1);
-      return new Response(null, { status: 204 });
-    }
-  }
-
-  // POST /api/accounts/:id/metadata
-  const metadataPostMatch = pathname.match(/^\/api\/accounts\/([^/]+)\/metadata$/);
-  if (method === "POST" && metadataPostMatch) {
-    const accountId = metadataPostMatch[1]!;
-    const data = await req.json() as { label: string; content: string };
-    const meta: MockMetadata = {
-      account_id: accountId,
-      nanoid: "meta_" + nextId(),
-      label: data.label,
-      content: data.content,
-    };
-    mockMetadata.push(meta);
-    return Response.json(meta, { status: 201 });
-  }
-
-  return Response.json({ error: "not found" }, { status: 404 });
-}
-
-// Tristate JSON handling
-function resolveTristateField(data: Record<string, unknown>, key: string): string | null {
-  if (!(key in data)) return null;
-  return data[key] as string | null;
-}
-
-function resolveTristateUpdate(data: Record<string, unknown>, key: string, existing: string | null): string | null {
-  if (!(key in data)) return existing;
-  return data[key] as string | null;
-}
-
-// ============================================================
-// Real API proxy (with lazy token refresh)
-// ============================================================
-
-const PROXY_ALLOWED_HEADERS = [
-  "content-type",
-  "accept",
-  "content-length",
-];
-
-async function proxyToEmumet(req: Request, pathname: string): Promise<Response> {
-  const apiPath = pathname.replace(/^\/api/, "");
-  const targetUrl = EMUMET_API_URL + apiPath + new URL(req.url).search;
-
-  const headers = new Headers();
-  for (const key of PROXY_ALLOWED_HEADERS) {
-    const value = req.headers.get(key);
-    if (value) headers.set(key, value);
-  }
-
-  // Read and optionally refresh session — reject unauthenticated requests
-  let session = await getRealSession(req);
-  if (!session) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  let updatedSessionHeaders: Headers | null = null;
-
-  if (isSessionExpiringSoon(session)) {
-    const refreshed = await refreshAccessToken(session);
-    if (refreshed) {
-      session = refreshed;
-      updatedSessionHeaders = new Headers();
-      await setRealSessionCookie(updatedSessionHeaders, refreshed);
-    } else if (session.expiresAt <= Math.floor(Date.now() / 1000)) {
-      // Fully expired, no refresh possible
-      const h = new Headers({ "Content-Type": "application/json" });
-      h.append("Set-Cookie", clearCookieHeader(SESSION_COOKIE_NAME));
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: h });
-    }
-  }
-
-  // Inject Bearer token (NEVER forward browser's Authorization header)
-  headers.set("Authorization", "Bearer " + session.accessToken);
-  // DEBUG: Log JWT claims for troubleshooting
-  try {
-    const payload = session.accessToken.split(".")[1]!;
-    const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(payload.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))));
-    console.log("[DEBUG proxy] JWT claims:", JSON.stringify({ iss: claims.iss, sub: claims.sub, aud: claims.aud, exp: claims.exp, scp: claims.scp }));
-    console.log("[DEBUG proxy] Target URL:", targetUrl);
-  } catch (e) { console.log("[DEBUG proxy] JWT decode error:", e); }
-
-  const proxyReq = new Request(targetUrl, {
-    method: req.method,
-    headers,
-    body: req.body,
-  });
-
-  try {
-    const response = await fetch(proxyReq);
-    // Strip upstream Set-Cookie
-    const responseHeaders = new Headers(response.headers);
-    responseHeaders.delete("set-cookie");
-    // Append refreshed session cookie if applicable
-    if (updatedSessionHeaders) {
-      for (const sc of updatedSessionHeaders.getSetCookie()) {
-        responseHeaders.append("Set-Cookie", sc);
-      }
-    }
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders,
-    });
-  } catch (err) {
-    console.error("Proxy error:", err);
-    return Response.json(
-      { error: "Failed to reach upstream service" },
-      { status: 502 }
-    );
-  }
-}
-
-// ============================================================
 // SSR
 // ============================================================
 
@@ -1065,6 +650,28 @@ if (!USE_MOCK) {
   }
 }
 
+// GraphQL BFF (bff/): SessionAdapter は USE_MOCK に応じて切替。
+// Mock: base64 MockSession を解決 + プロセス共有の MockEmumetClient (token 無視)。
+// Real: AES-GCM AppSession + Hydra refresh + token から RealEmumetClient を生成。
+const sessionAdapter: SessionAdapter<{ accessToken: string }> = USE_MOCK
+  ? createMockSessionAdapter()
+  : createSessionAdapter({
+      cookieSecretBase64: COOKIE_SECRET_BASE64!,
+      sessionCookieName: SESSION_COOKIE_NAME,
+      isSecureOrigin: IS_SECURE_ORIGIN,
+      hydraPublicUrl: HYDRA_PUBLIC_URL,
+      hydraClientId: HYDRA_CLIENT_ID,
+      hydraClientSecret: HYDRA_CLIENT_SECRET,
+      refreshSkewSeconds: SESSION_REFRESH_SKEW_SECONDS,
+    });
+const sharedMockEmumetClient = USE_MOCK ? createMockEmumetClient() : null;
+const yogaHandler = createYogaHandler(
+  sessionAdapter,
+  sharedMockEmumetClient
+    ? () => sharedMockEmumetClient
+    : (token) => createRealEmumetClient({ baseUrl: EMUMET_API_URL }, token),
+);
+
 Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
@@ -1072,20 +679,14 @@ Bun.serve({
     const staticResponse = serveStatic(url.pathname);
     if (staticResponse) return staticResponse;
 
+    // GraphQL BFF endpoint
+    if (url.pathname === "/graphql") return yogaHandler(req);
+
     // Auth endpoints (BFF)
     if (url.pathname.startsWith("/auth/")) {
       const authHandler = USE_MOCK ? handleMockAuth : handleRealAuth;
       const authResponse = await authHandler(req, url.pathname);
       if (authResponse) return authResponse;
-    }
-
-    // API proxy
-    if (url.pathname.startsWith("/api/")) {
-      if (USE_MOCK) {
-        return handleMockApi(req, url.pathname);
-      } else {
-        return proxyToEmumet(req, url.pathname);
-      }
     }
 
     return serveSSR(url);
