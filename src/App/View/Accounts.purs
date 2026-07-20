@@ -2,7 +2,7 @@ module App.View.Accounts where
 
 import Prelude
 
-import App.Api.Emumet.Types (AccountResponse(..))
+import App.Api.GraphQL.Types (AccountResponse(..))
 import App.Message (Message)
 import App.Model (RemoteData(..))
 import App.Route as Route

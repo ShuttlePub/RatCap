@@ -1,6 +1,6 @@
 module App.Message where
 
-import App.Api.Emumet.Types (AccountResponse, MetadataResponse, ProfileResponse)
+import App.Api.GraphQL.Types (AccountResponse, MetadataResponse, ProfileResponse)
 import App.Model (AccountWithDetails, SessionInfo)
 import App.Route (Route)
 import Data.Maybe (Maybe)
@@ -25,7 +25,7 @@ data Message
   | FetchAccounts
   | AccountsLoaded (Array AccountResponse)
   | AccountsFailed String
-  -- Account detail (fetch account + profile + metadata in parallel)
+  -- Account detail (account + profile + metadata via one GraphQL query)
   | FetchAccountDetail String
   | AccountDetailLoaded String AccountWithDetails
   | AccountDetailFailed String String
@@ -43,7 +43,6 @@ data Message
   | SetEditProfileBannerUrl String
   | SaveProfile
   | ProfileSaved Int String ProfileResponse -- generation, accountId, profile
-  | ProfileSavedRefreshFailed Int String String -- generation, accountId, refresh error (save succeeded, re-fetch failed)
   | ProfileSaveFailed Int String String -- generation, accountId, errorMsg
   | CancelEditProfile
   -- Metadata editing
@@ -53,7 +52,6 @@ data Message
   | SetMetadataContent String
   | SaveMetadata
   | MetadataSaved Int String MetadataResponse -- generation, accountId, metadata
-  | MetadataSavedRefreshFailed Int String String -- generation, accountId, refresh error (save succeeded, re-fetch failed)
   | MetadataSaveFailed Int String String -- generation, accountId, errorMsg
   | CancelMetadata
   | DeleteMetadata String

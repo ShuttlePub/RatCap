@@ -5,13 +5,11 @@ import Prelude
 import App.Api.Client (ApiError(..), printApiError)
 import App.Api.Auth as Auth
 import App.Api.Auth (LoginRequest(..), LoginResponse(..), SessionResponse(..))
-import App.Api.Emumet.Client as Emumet
-import App.Api.Emumet.Tristate (Tristate(..))
-import App.Api.Emumet.Types (AccountResponse(..), CreateAccountRequest(..), CreateMetadataRequest(..), MetadataResponse(..), ProfileResponse(..), UpdateMetadataRequest(..), UpdateProfileRequest(..))
+import App.Api.GraphQL as GraphQL
+import App.Api.GraphQL.Types (AccountResponse(..), MetadataResponse(..), ProfileResponse(..), Tristate(..))
 import App.Message (Message(..))
 import App.Model (AccountWithDetails, Model, RemoteData(..), emptyLoginForm, emptyNewAccountForm, isProtectedRoute, pageForMaybeRoute)
 import App.Route (Route(..), routeCodec)
-import Control.Parallel (parallel, sequential)
 import Data.Array (filter, find)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
@@ -185,7 +183,7 @@ mkUpdate nav model = case _ of
     if model.route == Just Home then noMessages $ model { accounts = Failed, errorMessage = Just msg }
     else noMessages model
 
-  -- Account detail: fetch account + profile + metadata (parallel)
+  -- Account detail: fetch account + profile + metadata (single GraphQL query)
   FetchAccountDetail id ->
     Tuple (model { selectedAccount = Loading })
       [ fetchAccountDetailAff id ]
@@ -302,7 +300,7 @@ mkUpdate nav model = case _ of
     else if currentAccountId model == Just accountId then case model.selectedAccount of
       Loaded d ->
         noMessages $ model
-          { selectedAccount = Loaded (d { profile = Just profile, profileStale = false })
+          { selectedAccount = Loaded (d { profile = Just profile })
           , editProfileForm = Nothing
           , errorMessage = Nothing
           , savePending = false
@@ -313,21 +311,6 @@ mkUpdate nav model = case _ of
   ProfileSaveFailed gen accountId msg ->
     if gen /= model.saveGeneration then noMessages model
     else if currentAccountId model == Just accountId then noMessages $ model { errorMessage = Just msg, savePending = false }
-    else noMessages $ model { savePending = false }
-
-  ProfileSavedRefreshFailed gen accountId _refreshErr ->
-    -- Save succeeded; only the follow-up re-fetch failed. Mark the profile as stale
-    -- so the View renders a persistent banner until the user gets a fresh state.
-    if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId then case model.selectedAccount of
-      Loaded d ->
-        noMessages $ model
-          { selectedAccount = Loaded (d { profileStale = true })
-          , editProfileForm = Nothing
-          , savePending = false
-          , errorMessage = Nothing
-          }
-      _ -> noMessages $ model { editProfileForm = Nothing, savePending = false }
     else noMessages $ model { savePending = false }
 
   CancelEditProfile ->
@@ -388,7 +371,7 @@ mkUpdate nav model = case _ of
             Nothing -> d.metadata <> [ meta ]
         in
           noMessages $ model
-            { selectedAccount = Loaded (d { metadata = newMetadata, metadataStale = false })
+            { selectedAccount = Loaded (d { metadata = newMetadata })
             , editMetadataForm = Nothing
             , errorMessage = Nothing
             , savePending = false
@@ -399,21 +382,6 @@ mkUpdate nav model = case _ of
   MetadataSaveFailed gen accountId msg ->
     if gen /= model.saveGeneration then noMessages model
     else if currentAccountId model == Just accountId then noMessages $ model { errorMessage = Just msg, savePending = false }
-    else noMessages $ model { savePending = false }
-
-  MetadataSavedRefreshFailed gen accountId _refreshErr ->
-    -- Save succeeded; only the follow-up re-fetch failed (or returned list missing the item).
-    -- Mark metadata as stale so the View renders a persistent banner.
-    if gen /= model.saveGeneration then noMessages model
-    else if currentAccountId model == Just accountId then case model.selectedAccount of
-      Loaded d ->
-        noMessages $ model
-          { selectedAccount = Loaded (d { metadataStale = true })
-          , editMetadataForm = Nothing
-          , savePending = false
-          , errorMessage = Nothing
-          }
-      _ -> noMessages $ model { editMetadataForm = Nothing, savePending = false }
     else noMessages $ model { savePending = false }
 
   CancelMetadata ->
@@ -452,11 +420,6 @@ mkUpdate nav model = case _ of
 findMetadata :: String -> Array MetadataResponse -> Maybe MetadataResponse
 findMetadata targetId = find (\(MetadataResponse r) -> r.nanoid == targetId)
 
--- | Check if an ApiError is a 404 (resource not found = not yet created)
-is404 :: ApiError -> Boolean
-is404 (HttpError 404 _) = true
-is404 _ = false
-
 -- | Check if an ApiError is a 401 (session expired / unauthorized)
 isUnauthorized :: ApiError -> Boolean
 isUnauthorized (HttpError 401 _) = true
@@ -475,7 +438,7 @@ checkSessionAff = do
 
 fetchAccountsAff :: Aff (Maybe Message)
 fetchAccountsAff = do
-  result <- Emumet.fetchAccounts
+  result <- GraphQL.fetchAccounts
   pure $ Just $ case result of
     Right accs -> AccountsLoaded accs
     Left err | isUnauthorized err -> SessionExpired
@@ -483,41 +446,20 @@ fetchAccountsAff = do
 
 fetchAccountDetailAff :: String -> Aff (Maybe Message)
 fetchAccountDetailAff id = do
-  accResult <- Emumet.fetchAccount id
-  case accResult of
-    Left err | isUnauthorized err -> pure $ Just SessionExpired
-    Left err -> pure $ Just $ AccountDetailFailed id (printApiError err)
-    Right acc -> do
-      let AccountResponse a = acc
-      -- Fetch profile and metadata in parallel
-      Tuple profileResult metadataResult <- sequential $
-        Tuple <$> parallel (Emumet.fetchProfile a.id) <*> parallel (Emumet.fetchMetadata a.id)
-      -- Check for 401 in parallel results first (session expired)
-      case profileResult, metadataResult of
-        Left err, _ | isUnauthorized err -> pure $ Just SessionExpired
-        _, Left err | isUnauthorized err -> pure $ Just SessionExpired
-        _, _ -> do
-          -- 404 = not yet created (normal), other errors = real failure
-          let
-            profileOutcome = case profileResult of
-              Right p -> Right (Just p)
-              Left err -> if is404 err then Right Nothing else Left err
-            metadataOutcome = case metadataResult of
-              Right ms -> Right ms
-              Left err -> if is404 err then Right [] else Left err
-          case profileOutcome, metadataOutcome of
-            Left err, _ -> pure $ Just $ AccountDetailFailed id ("Failed to load profile: " <> printApiError err)
-            _, Left err -> pure $ Just $ AccountDetailFailed id ("Failed to load metadata: " <> printApiError err)
-            Right profile, Right metadata ->
-              let
-                detail :: AccountWithDetails
-                detail = { account: acc, profile, metadata, profileStale: false, metadataStale: false }
-              in
-                pure $ Just $ AccountDetailLoaded id detail
+  result <- GraphQL.fetchAccountDetail id
+  pure $ Just $ case result of
+    Left err | isUnauthorized err -> SessionExpired
+    Left err -> AccountDetailFailed id (printApiError err)
+    Right r ->
+      let
+        detail :: AccountWithDetails
+        detail = { account: r.account, profile: r.profile, metadata: r.metadata }
+      in
+        AccountDetailLoaded id detail
 
 submitNewAccountAff :: String -> Boolean -> Aff (Maybe Message)
 submitNewAccountAff name isBot = do
-  result <- Emumet.createAccount (CreateAccountRequest { name, isBot })
+  result <- GraphQL.createAccount name isBot
   pure $ Just $ case result of
     Right acc -> AccountCreated acc
     Left err | isUnauthorized err -> SessionExpired
@@ -525,50 +467,27 @@ submitNewAccountAff name isBot = do
 
 saveProfileAff :: Int -> String -> { displayName :: Tristate String, summary :: Tristate String, iconUrl :: Tristate String, bannerUrl :: Tristate String } -> Aff (Maybe Message)
 saveProfileAff gen accountId fields = do
-  result <- Emumet.updateProfile accountId (UpdateProfileRequest fields)
-  case result of
-    Left err | isUnauthorized err -> pure $ Just SessionExpired
-    Left err -> pure $ Just $ ProfileSaveFailed gen accountId (printApiError err)
-    Right _ -> do
-      -- PUT returns 204 No Content; re-fetch to get the updated profile.
-      -- Save itself succeeded, so a re-fetch failure must NOT be reported as a save failure.
-      fetched <- Emumet.fetchProfile accountId
-      pure $ Just $ case fetched of
-        Right profile -> ProfileSaved gen accountId profile
-        Left err | isUnauthorized err -> SessionExpired
-        Left err -> ProfileSavedRefreshFailed gen accountId (printApiError err)
+  -- Mutation returns the updated profile directly; no re-fetch needed.
+  result <- GraphQL.updateProfile accountId fields
+  pure $ Just $ case result of
+    Right profile -> ProfileSaved gen accountId profile
+    Left err | isUnauthorized err -> SessionExpired
+    Left err -> ProfileSaveFailed gen accountId (printApiError err)
 
 saveMetadataAff :: Int -> String -> Maybe String -> { label :: String, content :: String } -> Aff (Maybe Message)
 saveMetadataAff gen accountId mNanoid fields = do
-  case mNanoid of
-    Just nanoid -> do
-      -- Update path: PUT returns 204, re-fetch metadata list and pick this entry.
-      -- Save itself succeeded, so a re-fetch failure (or item-not-found in the refreshed list)
-      -- must NOT be reported as a save failure.
-      result <- Emumet.updateMetadata accountId nanoid (UpdateMetadataRequest fields)
-      case result of
-        Left err | isUnauthorized err -> pure $ Just SessionExpired
-        Left err -> pure $ Just $ MetadataSaveFailed gen accountId (printApiError err)
-        Right _ -> do
-          fetched <- Emumet.fetchMetadata accountId
-          pure $ Just $ case fetched of
-            Left err | isUnauthorized err -> SessionExpired
-            Left err -> MetadataSavedRefreshFailed gen accountId (printApiError err)
-            Right metas ->
-              case findMetadata nanoid metas of
-                Just meta -> MetadataSaved gen accountId meta
-                Nothing -> MetadataSavedRefreshFailed gen accountId "Saved, but the updated item was not found in the refreshed list"
-    Nothing -> do
-      -- Create path: POST returns 201 + body
-      result <- Emumet.createMetadata accountId (CreateMetadataRequest fields)
-      pure $ Just $ case result of
-        Right meta -> MetadataSaved gen accountId meta
-        Left err | isUnauthorized err -> SessionExpired
-        Left err -> MetadataSaveFailed gen accountId (printApiError err)
+  -- Mutations return the saved metadata directly; no re-fetch needed.
+  result <- case mNanoid of
+    Just nanoid -> GraphQL.updateMetadata accountId nanoid fields
+    Nothing -> GraphQL.createMetadata accountId fields
+  pure $ Just $ case result of
+    Right meta -> MetadataSaved gen accountId meta
+    Left err | isUnauthorized err -> SessionExpired
+    Left err -> MetadataSaveFailed gen accountId (printApiError err)
 
 deleteMetadataAff :: Int -> String -> String -> Aff (Maybe Message)
 deleteMetadataAff gen accountId nanoid = do
-  result <- Emumet.deleteMetadata accountId nanoid
+  result <- GraphQL.deleteMetadata accountId nanoid
   pure $ Just $ case result of
     Right _ -> MetadataDeleted gen accountId nanoid
     Left err | isUnauthorized err -> SessionExpired
