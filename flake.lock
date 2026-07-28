@@ -36,7 +36,58 @@
         "type": "github"
       }
     },
+    "intent-system": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784538199,
+        "narHash": "sha256-MdDdCTrhjn1knCHW53tyuC1j+tlC2ganz39JtMjzrhc=",
+        "owner": "J-Tech-Japan",
+        "repo": "intent-system",
+        "rev": "cf4df97f9d42451bae9e43f044d3ea4c728a4a0d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "J-Tech-Japan",
+        "repo": "intent-system",
+        "type": "github"
+      }
+    },
+    "intent-system-flake": {
+      "inputs": {
+        "intent-system": "intent-system",
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1784959828,
+        "narHash": "sha256-7hSqsGV4fl4HA/d1y3QCcn5HisF+ETsJwhdfRQLc5E8=",
+        "owner": "turtton",
+        "repo": "intent-system-flake",
+        "rev": "bea50772fdf11ed838ed218fca04c86fca475b3d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "turtton",
+        "repo": "intent-system-flake",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1781074563,
+        "narHash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1772736753,
         "narHash": "sha256-au/m3+EuBLoSzWUCb64a/MZq6QUtOV8oC0D9tY2scPQ=",
@@ -76,7 +127,8 @@
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs",
+        "intent-system-flake": "intent-system-flake",
+        "nixpkgs": "nixpkgs_2",
         "purescript-overlay": "purescript-overlay",
         "systems": "systems",
         "treefmt-nix": "treefmt-nix"
