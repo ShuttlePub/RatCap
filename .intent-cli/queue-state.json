@@ -1,0 +1,28 @@
+{
+  "schema_version": "1",
+  "updated_at": "2026-07-28T15:05:44.4366787+00:00",
+  "items": [
+    {
+      "execution_unit": "settings-hub-core",
+      "title": "settings-hub: Settings \u753B\u9762\u3092\u8A2D\u5B9A\u30CF\u30D6\u3068\u3057\u3066\u672C\u5B9F\u88C5\u3059\u308B",
+      "state": "queued",
+      "dependencies": [],
+      "blocked_by": [],
+      "clarification_return_path": "intents/ratcap/clarifications/open.md",
+      "packet_paths": {
+        "implementation": ".intent-cli/issues/settings-hub-core/implementation.md",
+        "review_context": ".intent-cli/issues/settings-hub-core/review-context.md",
+        "yaml": ".intent-cli/issues/settings-hub-core/packet.yaml"
+      },
+      "linked_issue": {
+        "repo": "ShuttlePub/Ratcap",
+        "number": 3,
+        "url": "https://github.com/ShuttlePub/RatCap/issues/3"
+      },
+      "worker_role": "Claude",
+      "review_role": "Codex",
+      "priority": "high",
+      "priority_revision": 0
+    }
+  ]
+}

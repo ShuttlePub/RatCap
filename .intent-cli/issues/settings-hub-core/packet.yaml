@@ -1,0 +1,55 @@
+implementation_issue_packet:
+  issue_title: "settings-hub: Settings 画面を設定ハブとして本実装する"
+  issue_kind: feature
+  source_execution_unit: settings-hub-core
+  domain: ratcap
+  target_repo: ShuttlePub/Ratcap
+  target_path: src/App/View/Settings.purs, src/App/View.purs
+  target_part: "Settings ページのビューとディスパッチ (Model 受け渡し含む)"
+  dependencies: []
+  technical_baseline:
+    - "PureScript + Flame (Elm アーキテクチャ)、SSR + クライアントハイドレーション構成"
+    - "Tailwind CSS v4、テーマヘルパーは src/App/Theme.purs"
+    - "SPA 内リンクは src/App/View/Link.purs の link 関数 (Navigate message 発行)"
+    - "セッション情報は Model.session :: Maybe SessionInfo"
+  intent_references:
+    - intents/ratcap/features/settings-hub/overview.md
+    - intents/ratcap/features/settings-hub/requirements.md
+    - intents/ratcap/features/settings-hub/acceptance.md
+    - intents/ratcap/intent-tree/00-map.md
+  acceptance_criteria:
+    - "/settings にアカウント設定 / セッション情報 / ブロック・ミュート (準備中) / 表示設定の 4 セクションが表示される"
+    - "既存の Color/Shape 選択 UI が表示設定セクション内に移動し、従来通り動作する (data-color-option / data-shape-option 属性を維持)"
+    - "セッション情報セクションにログイン中の username とログアウトボタン (Logout message 発行) が表示される"
+    - "アカウント設定セクションからアカウント一覧・詳細への導線が App.View.Link で張られ、SPA 遷移する"
+    - "spago build が成功する"
+    - "SSR 直接アクセス (/settings をリロード) とクライアント遷移の両方で同じ見た目が得られる (ハイドレーションが壊れない)"
+
+# G461: optional packet-time intent-maintenance metadata.
+intent_placement:
+  primary_intent: intents/ratcap/features/settings-hub/overview.md
+  supporting_intents:
+    - intents/ratcap/intent-tree/00-map.md
+  new_intent_needed: false
+  placement_rationale: "settings-hub feature の Packet 1+2 をそのまま execution unit 化したもの。新規 intent ノードは不要"
+knowledge_updates:
+  intent_tree:
+    required: false
+    target_paths: []
+    summary: ""
+  adr:
+    required: false
+    target_paths: []
+    decision_title: ""
+  diagram:
+    required: false
+    target_paths: []
+    diagram_type: none
+  docs:
+    required: false
+    target_paths: []
+    summary: ""
+closeout_learning:
+  expected: "Settings ハブのセクション構成が確定したら、block-mute / account-deactivation の packets.md の導線記述を実態に合わせて更新する"
+  write_back_required: false
+  write_back_targets: []

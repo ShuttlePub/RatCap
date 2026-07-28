@@ -1,0 +1,2 @@
+{"ts":"2026-07-28T15:05:31.794076+00:00","execution_unit":"settings-hub-core","event":"queue_seeded_from_packet","by":"automation queue-seed-from-packet (G363)","packet_ref":".intent-cli/issues/settings-hub-core/"}
+{"ts":"2026-07-28T15:05:44.4366787+00:00","execution_unit":"settings-hub-core","event":"issue-created","by":"issue-publish-flow","linked_issue":"ShuttlePub/Ratcap#3","reason":"https://github.com/ShuttlePub/RatCap/issues/3"}
