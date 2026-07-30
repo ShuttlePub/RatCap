@@ -29,6 +29,7 @@
 
 ### Emumet エンドポイント
 
+- `GET /api/v1/me` — セッションコンテキスト取得（ShuttlePub/Emumet#18、 ADR 0004）。レスポンス `{ account_id: AuthAccountId, instance_roles: ["admin" | "moderator"] }`。ロールなしは `200` + 空配列、 Keto 障害は `503`、未認証は `401`。
 - `POST /api/v1/admin/accounts/{id}/suspend` — アカウント停止（body: `{ reason: String!, expires_at?: DateTime }`）
 - `POST /api/v1/admin/accounts/{id}/unsuspend` — アカウント停止解除
 - `POST /api/v1/admin/accounts/{id}/ban` — アカウント BAN（body: `{ reason: String! }`）

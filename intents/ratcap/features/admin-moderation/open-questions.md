@@ -4,9 +4,9 @@
 
 ## Open questions blocking this feature
 
-- ~~**admin role のフロントエンドへの伝達方法**~~ **(2026-07-28 方針決定・外部依存あり)**
+- ~~**admin role のフロントエンドへの伝達方法**~~ **(2026-07-28 方針決定 / 2026-07-30 解決)**
   - 決定: Emumet にセッションコンテキスト解決エンドポイントを新設し (正源 Keto)、BFF は TTL キャッシュで利用する。詳細は [decisions.md](decisions.md) を参照。
-  - **ブロッカー**: Emumet 側エンドポイントの実装完了待ち。完了後に `bff/context.ts` / `bff/session.ts` / `src/App/Api/Auth.purs` / `src/App/Model.purs` への組み込みを行う。
+  - ~~**ブロッカー**: Emumet 側エンドポイントの実装完了待ち。~~ **解決**: `GET /api/v1/me` が Emumet に実装・マージされた (ShuttlePub/Emumet#18、ADR 0004)。これにより `bff/context.ts` / `bff/session.ts` / `src/App/Api/Auth.purs` / `src/App/Model.purs` への組み込みが unblocked。
 
 - **Mock モードでの admin ロール割り当て**
   - mock 認証では username が自由な文字列のため、どの username を admin として扱うか未決定。

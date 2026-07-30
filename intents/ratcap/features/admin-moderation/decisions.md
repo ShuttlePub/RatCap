@@ -13,10 +13,15 @@
   - リゾルバは `requireAdmin(context)` ヘルパーを呼び出し、非 admin 時は `GraphQLError("Forbidden", { extensions: { code: "FORBIDDEN" } })` を投げる。
   - Mock モードでは固定の admin ユーザー名（例: `admin@example.com`）または特定の username を admin として扱う。実装時に `open-questions.md` の解決に従う。
 
-- **ロール解決の正源 (2026-07-28 方針決定・実装待ち)**
-  - ロール / 権限の正源は Keto とし、 **Emumet にセッションコンテキスト解決エンドポイントを新設** する (現在 Emumet 側で実装中)。Ratcap が権限モデルを二重に持たない分離とする。
-  - Ratcap (BFF) 側は同エンドポイントの結果を **TTL キャッシュ** する。管理操作は低頻度のため短めの TTL (30〜60 秒程度) を想定。
-  - **本 feature は Emumet 側エンドポイントの実装完了まで blocked。** 完了後に BFF context への組み込みと `SessionInfo` への admin フラグ露出を行う。
+- **ロール解決の正源 (2026-07-28 方針決定 / 2026-07-30 Emumet 側実装完了)**
+  - ロール / 権限の正源は Keto とし、 **Emumet にセッションコンテキスト解決エンドポイントを新設** する。Ratcap が権限モデルを二重に持たない分離とする。
+  - **Emumet 側実装完了** (ShuttlePub/Emumet#18 マージ、ADR 0004)。エンドポイント契約:
+    - `GET /api/v1/me` → `200 { "account_id": "<AuthAccountId>", "instance_roles": ["admin" | "moderator"] }`
+    - ロールなしは `200` + `instance_roles: []` (403 ではない)。Keto 障害は `503` (空配列へのフォールバックなし)。未認証は `401`。
+    - roles は Keto relation の direct 結果であり、 admin が moderator を暗黙に含まない。
+    - `account_id` は `AuthAccountId` (1 auth identity が複数 Account に紐づきうるため AccountId ではない)。
+  - Ratcap (BFF) 側は同エンドポイントの結果を **TTL キャッシュ** する。管理操作は低頻度のため短めの TTL (30〜60 秒程度) を想定。セッション確立時に呼び出し、 403 受信時に再取得する運用 (Emumet 側の想定運用に一致)。
+  - ~~本 feature は Emumet 側エンドポイントの実装完了まで blocked。~~ **unblocked 済み。** BFF context への組み込みと `SessionInfo` への admin フラグ露出を実施可能。
 
 - **EmumetClient 契約**
   - `suspendAccount(id, reason, expiresAt)` は `expiresAt` を ISO 8601 文字列または `null` で受け取り、 `POST /api/v1/admin/accounts/{id}/suspend` の body `{ reason, expires_at }` に変換する。
