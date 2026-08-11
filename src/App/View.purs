@@ -16,7 +16,7 @@ view model = Layout.page model
   [ case model.page of
       Home -> Accounts.view model.accounts model.errorMessage
       Login -> Login.view model.loginForm model.errorMessage model.savePending
-      Settings -> Settings.view
+      Settings -> Settings.view model
       AccountNew -> AccountNew.view model.newAccountForm model.errorMessage model.savePending
       AccountDetail -> AccountDetail.view model.selectedAccount model.editProfileForm model.editMetadataForm model.errorMessage model.savePending
       NotFound -> NotFound.view
