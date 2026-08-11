@@ -1,7 +1,0 @@
-execution_unit: settings-hub-core
-publish_status: issue-created
-packet_path: "/home/turtton/Documents/ShuttlePub/Ratcap/.intent-cli/issues/settings-hub-core"
-issue_body_path: "/home/turtton/Documents/ShuttlePub/Ratcap/.intent-cli/issues/settings-hub-core/github-body.md"
-created_issue_number: 3
-created_issue_url: "https://github.com/ShuttlePub/RatCap/issues/3"
-published_label_name: null
