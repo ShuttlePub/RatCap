@@ -2,25 +2,86 @@ module App.View.Settings where
 
 import Prelude
 
-import App.Message (Message)
+import App.Message (Message(..))
+import App.Model (Model, SessionInfo)
+import App.Route (Route(..))
 import App.Theme as T
+import App.View.Link (link)
+import Data.Maybe (Maybe(..))
 import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 
-view :: Html Message
-view =
+view :: Model -> Html Message
+view model =
   HE.div [ HA.class' "space-y-8" ]
     [ HE.h1 [ HA.class' ("text-4xl font-bold tracking-tight " <> T.textHeading) ]
         [ HE.text "Settings" ]
-    , colorSection
-    , shapeSection
+    , accountSection
+    , sessionSection model.session
+    , blockMuteSection
+    , displaySection
+    ]
+
+section :: String -> Array (Html Message) -> Html Message
+section title children =
+  HE.section [ HA.class' "space-y-3" ]
+    ( [ HE.h2 [ HA.class' ("text-xl font-semibold " <> T.textPrimary) ]
+          [ HE.text title ]
+      ]
+        <> children
+    )
+
+accountSection :: Html Message
+accountSection =
+  section "アカウント設定"
+    [ HE.p [ HA.class' ("text-sm " <> T.textMuted) ]
+        [ HE.text "アカウントの一覧や詳細の確認はこちらから。" ]
+    , HE.div_ [ link Home [ HE.text "アカウント一覧へ" ] ]
+    ]
+
+sessionSection :: Maybe SessionInfo -> Html Message
+sessionSection session =
+  section "セッション情報" $ case session of
+    Just info ->
+      [ HE.div [ HA.class' (T.surface <> " p-4 flex items-center justify-between gap-3") ]
+          [ HE.span [ HA.class' ("text-sm " <> T.textPrimary) ]
+              [ HE.text ("ログイン中: " <> info.username) ]
+          , HE.button
+              [ HA.class' ("px-3 py-2 text-sm font-medium " <> T.textSecondary <> " " <> T.roundedTheme <> " transition-colors " <> T.hoverTextAccent <> " hover:bg-bg-surface")
+              , HA.onClick Logout
+              ]
+              [ HE.text "ログアウト" ]
+          ]
+      ]
+    Nothing ->
+      [ HE.p [ HA.class' ("text-sm " <> T.textMuted) ]
+          [ HE.text "ログインしていません" ]
+      , HE.div_ [ link Login [ HE.text "ログインページへ" ] ]
+      ]
+
+blockMuteSection :: Html Message
+blockMuteSection =
+  section "ブロック/ミュート（準備中）"
+    [ HE.p [ HA.class' ("text-sm " <> T.textMuted) ]
+        [ HE.text "ブロック・ミュートしたアカウントを管理する機能です。" ]
+    , HE.p [ HA.class' ("text-sm " <> T.textMuted) ]
+        [ HE.text "今後の機能です。" ]
+    ]
+
+displaySection :: Html Message
+displaySection =
+  section "表示設定"
+    [ HE.div [ HA.class' "space-y-6" ]
+        [ colorSection
+        , shapeSection
+        ]
     ]
 
 colorSection :: Html Message
 colorSection =
   HE.div [ HA.class' "space-y-3" ]
-    [ HE.h2 [ HA.class' ("text-xl font-semibold " <> T.textPrimary) ]
+    [ HE.h3 [ HA.class' ("text-base font-semibold " <> T.textPrimary) ]
         [ HE.text "Color" ]
     , HE.div [ HA.class' "flex gap-3" ]
         [ colorCard "catppuccin-mocha" "#cba6f7" "Catppuccin Mocha"
@@ -47,7 +108,7 @@ colorCard value swatch label =
 shapeSection :: Html Message
 shapeSection =
   HE.div [ HA.class' "space-y-3" ]
-    [ HE.h2 [ HA.class' ("text-xl font-semibold " <> T.textPrimary) ]
+    [ HE.h3 [ HA.class' ("text-base font-semibold " <> T.textPrimary) ]
         [ HE.text "Shape" ]
     , HE.div [ HA.class' "flex gap-3" ]
         [ shapeCard "rounded" "Rounded"
