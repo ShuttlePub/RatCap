@@ -1,11 +1,11 @@
 {
   "schema_version": "1",
-  "updated_at": "2026-07-28T15:05:44.4366787+00:00",
+  "updated_at": "2026-08-11T11:53:21.6614127+00:00",
   "items": [
     {
       "execution_unit": "settings-hub-core",
       "title": "settings-hub: Settings \u753B\u9762\u3092\u8A2D\u5B9A\u30CF\u30D6\u3068\u3057\u3066\u672C\u5B9F\u88C5\u3059\u308B",
-      "state": "queued",
+      "state": "completed",
       "dependencies": [],
       "blocked_by": [],
       "clarification_return_path": "intents/ratcap/clarifications/open.md",
@@ -19,6 +19,7 @@
         "number": 3,
         "url": "https://github.com/ShuttlePub/RatCap/issues/3"
       },
+      "linked_pr": "https://github.com/ShuttlePub/Ratcap/pull/4",
       "worker_role": "Claude",
       "review_role": "Codex",
       "priority": "high",
