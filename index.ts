@@ -19,6 +19,7 @@ import {
   type MockSession,
 } from "./bff/session.ts";
 import { createYogaHandler } from "./bff/server.ts";
+import { createConsentHandler } from "./bff/consent.ts";
 import { createMockEmumetClient } from "./bff/emumet/mock.ts";
 import { createRealEmumetClient } from "./bff/emumet/real.ts";
 import type { SessionAdapter } from "./bff/session.ts";
@@ -671,6 +672,7 @@ const yogaHandler = createYogaHandler(
     ? () => sharedMockEmumetClient
     : (token) => createRealEmumetClient({ baseUrl: EMUMET_API_URL }, token),
 );
+const consentHandler = createConsentHandler({ emumetApiUrl: EMUMET_API_URL, appOrigin: APP_ORIGIN });
 
 Bun.serve({
   async fetch(req) {
@@ -687,6 +689,10 @@ Bun.serve({
       const authHandler = USE_MOCK ? handleMockAuth : handleRealAuth;
       const authResponse = await authHandler(req, url.pathname);
       if (authResponse) return authResponse;
+    }
+
+    if (!USE_MOCK && url.pathname === "/oauth2/consent") {
+      return consentHandler(req);
     }
 
     return serveSSR(url);
