@@ -1,0 +1,12 @@
+diff --git a/ory/hydra/hydra.yml b/ory/hydra/hydra.yml
+--- a/ory/hydra/hydra.yml
++++ b/ory/hydra/hydra.yml
+@@ -8,7 +8,7 @@ urls:
+   self:
+     issuer: http://localhost:4444/
+   login: http://localhost:8080/oauth2/login
+-  consent: http://localhost:8080/oauth2/consent
++  consent: http://localhost:3000/oauth2/consent
+   post_logout_redirect: http://localhost:3000/
+ 
+ secrets:
