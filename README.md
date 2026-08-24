@@ -116,6 +116,28 @@ bun scripts/register-hydra-client.ts
 - **メールアドレス**: 任意の文字列
 - **パスワード**: `password`
 
+### OAuth2 同意画面 (`/oauth2/consent`)
+
+Real モード (`USE_MOCK=false`) のみで有効な、Hydra 手動同意フロー用の standalone HTML ページです。`/auth/*` と同じ BFF 層で完結し、PureScript / Flame SSR は経由しません。
+
+- `GET /oauth2/consent?consent_challenge=...`: Emumet の consent API (`GET {EMUMET_API_URL}/oauth2/consent`) からクライアント名・要求スコープを取得して同意フォームを描画します。auto-skip 時 (Emumet が 302 を返す場合) は同意ページを生成せず 302 をそのまま伝搬します。
+- `POST /oauth2/consent`: フォーム送信された許可 (`accept: true` + `grant_scope`) / 拒否 (`accept: false`) を Emumet (`POST {EMUMET_API_URL}/oauth2/consent`) へ中継し、返された 302 `Location` へそのままリダイレクトします。
+- スコープ表示は日本語プライマリのラベルマップで、`Accept-Language` ヘッダからサーバーサイドで言語を判定します (英語対応、未知スコープは生名フォールバック)。
+- `ratcap_session` cookie は要求しません (challenge ベースの非認証エンドポイント)。challenge 欠落・不正時はエラーページを表示します。
+- mock モードでは本エンドポイントは登録されません。
+
+### Hydra consent URL の設定 (デプロイ)
+
+手動同意フローを完結させるには、Hydra の `urls.consent` を Emumet ではなく Ratcap に向ける必要があります。Emumet リポジトリの `ory/hydra/hydra.yml` に対する変更を `deploy/hydra-consent-url.patch` として同梱しています。
+
+```bash
+cd /path/to/Emumet
+git apply --check /path/to/Ratcap/deploy/hydra-consent-url.patch
+git apply /path/to/Ratcap/deploy/hydra-consent-url.patch
+```
+
+変更内容は `urls.consent` の `http://localhost:8080/oauth2/consent` (Emumet) → `http://localhost:3000/oauth2/consent` (Ratcap) の 1 行のみです。適用後は Hydra を再起動 (または設定リロード) してください。
+
 ### GraphQL の型再生成
 
 SDL スキーマ (`bff/schema.graphql`) を変更した場合、PureScript 側の型を再生成する必要があります。
