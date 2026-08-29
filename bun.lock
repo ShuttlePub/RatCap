@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ratcap",
+      "name": "shuttlepub-frontends",
     },
     "apps/emumet-web": {
       "name": "emumet-web",

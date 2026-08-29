@@ -132,8 +132,8 @@ Real モード (`USE_MOCK=false`) のみで有効な、Hydra 手動同意フロ�
 
 ```bash
 cd /path/to/Emumet
-git apply --check /path/to/Ratcap/apps/emumet-web/deploy/hydra-consent-url.patch
-git apply /path/to/Ratcap/apps/emumet-web/deploy/hydra-consent-url.patch
+git apply --check /path/to/shuttlepub-frontends/apps/emumet-web/deploy/hydra-consent-url.patch
+git apply /path/to/shuttlepub-frontends/apps/emumet-web/deploy/hydra-consent-url.patch
 ```
 
 変更内容は `urls.consent` の `http://localhost:8080/oauth2/consent` (Emumet) → `http://localhost:3000/oauth2/consent` (Ratcap) の 1 行のみです。適用後は Hydra を再起動 (または設定リロード) してください。
