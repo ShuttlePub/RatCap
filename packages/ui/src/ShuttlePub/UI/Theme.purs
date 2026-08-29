@@ -1,4 +1,4 @@
-module App.Theme where
+module ShuttlePub.UI.Theme where
 
 import Prelude
 

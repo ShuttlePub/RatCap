@@ -6,7 +6,7 @@ import App.Api.GraphQL.Types (AccountResponse(..))
 import App.Message (Message)
 import App.Model (RemoteData(..))
 import App.Route as Route
-import App.Theme as T
+import ShuttlePub.UI.Theme as T
 import App.View.Link as Link
 import App.Format (formatDate)
 import Data.Array (null) as Array

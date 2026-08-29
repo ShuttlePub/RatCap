@@ -27,6 +27,7 @@
             "prelude",
             "routing",
             "routing-duplex",
+            "shuttlepub-ui",
             "strings",
             "tuples",
             "web-events"
@@ -684,7 +685,11 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "shuttlepub-ui": {
+        "path": "../../packages/ui"
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -1525,6 +1530,13 @@
         "foldable-traversable",
         "lists",
         "newtype",
+        "prelude"
+      ]
+    },
+    "shuttlepub-ui": {
+      "type": "local",
+      "path": "../../packages/ui",
+      "dependencies": [
         "prelude"
       ]
     },

@@ -6,7 +6,7 @@ import App.Api.GraphQL.Types (AccountResponse(..), MetadataResponse(..), Profile
 import App.Format (formatDate)
 import App.Message (Message(..))
 import App.Model (AccountWithDetails, EditMetadataForm, EditProfileForm, RemoteData(..))
-import App.Theme as T
+import ShuttlePub.UI.Theme as T
 import Data.Array (null) as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (take)

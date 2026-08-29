@@ -4,7 +4,7 @@ import Prelude
 
 import App.Message (Message(..))
 import App.Model (LoginForm)
-import App.Theme as T
+import ShuttlePub.UI.Theme as T
 import Data.Maybe (Maybe(..))
 import Data.String.Common (trim)
 import Flame (Html)

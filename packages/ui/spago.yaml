@@ -1,0 +1,4 @@
+package:
+  name: shuttlepub-ui
+  dependencies:
+    - prelude

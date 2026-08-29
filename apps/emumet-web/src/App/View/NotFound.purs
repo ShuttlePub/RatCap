@@ -3,7 +3,7 @@ module App.View.NotFound where
 import Prelude
 
 import App.Message (Message)
-import App.Theme as T
+import ShuttlePub.UI.Theme as T
 import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE

@@ -4,7 +4,7 @@ import Prelude
 
 import App.Message (Message(..))
 import App.Route (Route, routeCodec)
-import App.Theme as T
+import ShuttlePub.UI.Theme as T
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Flame (Html)

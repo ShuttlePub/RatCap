@@ -31,8 +31,8 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: purs-tidy check src/ test/
-        working-directory: apps/emumet-web
+      - run: purs-tidy check apps/emumet-web/src apps/emumet-web/test packages/ui/src
+        working-directory: .
 
       - run: bunx spago build
         working-directory: apps/emumet-web

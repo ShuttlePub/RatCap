@@ -5,7 +5,7 @@ import Prelude
 import App.Message (Message(..))
 import App.Model (Model, SessionInfo)
 import App.Route (Route(..))
-import App.Theme as T
+import ShuttlePub.UI.Theme as T
 import App.View.Link (link)
 import Data.Maybe (Maybe(..))
 import Flame (Html)
@@ -48,7 +48,7 @@ sessionSection session =
           [ HE.span [ HA.class' ("text-sm " <> T.textPrimary) ]
               [ HE.text ("ログイン中: " <> info.username) ]
           , HE.button
-              [ HA.class' ("px-3 py-2 text-sm font-medium " <> T.textSecondary <> " " <> T.roundedTheme <> " transition-colors " <> T.hoverTextAccent <> " hover:bg-bg-surface")
+              [ HA.class' T.navLink
               , HA.onClick Logout
               ]
               [ HE.text "ログアウト" ]
