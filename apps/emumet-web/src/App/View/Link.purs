@@ -4,25 +4,10 @@ import Prelude
 
 import App.Message (Message(..))
 import App.Route (Route, routeCodec)
-import ShuttlePub.UI.Theme as T
-import Data.Maybe (Maybe(..))
-import Effect (Effect)
 import Flame (Html)
-import Flame.Html.Attribute as HA
-import Flame.Html.Element as HE
 import Routing.Duplex (print)
-import Web.Event.Event (Event, preventDefault)
+import ShuttlePub.UI.Link as UI.Link
 
 link :: Route -> Array (Html Message) -> Html Message
 link route children =
-  HE.a
-    [ HA.href (print routeCodec route)
-    , HA.class' T.navLink
-    , HA.createRawEvent "click" handler
-    ]
-    children
-  where
-  handler :: Event -> Effect (Maybe Message)
-  handler event = do
-    preventDefault event
-    pure (Just (Navigate route))
+  UI.Link.navLink (print routeCodec route) (Navigate route) children

@@ -5,34 +5,29 @@ import Prelude
 import App.Message (Message(..))
 import App.Model (Model)
 import App.Route (Route(..))
-import ShuttlePub.UI.Theme as T
 import App.View.Link (link)
 import Data.Maybe (Maybe(..))
 import Flame (Html)
-import Flame.Html.Element as HE
 import Flame.Html.Attribute as HA
+import Flame.Html.Element as HE
+import ShuttlePub.UI.Layout as UI
+import ShuttlePub.UI.Theme as T
 
 page :: Model -> Array (Html Message) -> Html Message
 page model content =
-  HE.main [ HA.id "app", HA.class' ("min-h-screen antialiased " <> T.bgSecondary <> " " <> T.textPrimary) ]
-    [ nav model
-    , HE.div [ HA.id "content", HA.class' "max-w-4xl mx-auto px-6 py-12" ] content
-    ]
+  UI.shell [ nav model, UI.contentArea content ]
 
 nav :: Model -> Html Message
 nav model =
-  HE.nav [ HA.class' ("sticky top-0 z-10 backdrop-blur-md border-b " <> T.bgNav <> " " <> T.borderTheme) ]
-    [ HE.div [ HA.class' "max-w-4xl mx-auto px-6" ]
-        [ HE.div [ HA.class' "flex items-center justify-between h-16" ]
-            [ HE.span [ HA.class' ("text-lg font-bold tracking-tight " <> T.textHeading) ] [ HE.text "Ratcap" ]
-            , HE.ul [ HA.class' "flex items-center gap-1" ]
-                ( [ HE.li_ [ link Home [ HE.text "Home" ] ]
-                  , HE.li_ [ link Settings [ HE.text "Settings" ] ]
-                  ] <> authSection model
-                )
-            ]
-        ]
-    ]
+  UI.navBar brand
+    ( [ HE.li_ [ link Home [ HE.text "Home" ] ]
+      , HE.li_ [ link Settings [ HE.text "Settings" ] ]
+      ] <> authSection model
+    )
+
+brand :: Html Message
+brand =
+  HE.span [ HA.class' ("text-lg font-bold tracking-tight " <> T.textHeading) ] [ HE.text "Ratcap" ]
 
 authSection :: Model -> Array (Html Message)
 authSection model =
@@ -49,30 +44,3 @@ authSection model =
       ]
     Nothing ->
       [ HE.li_ [ link Login [ HE.text "Login" ] ] ]
-
-document :: Html Message -> Html Message
-document content =
-  HE.html
-    [ HA.lang "en"
-    , HA.createAttribute "data-color" "catppuccin-mocha"
-    , HA.createAttribute "data-shape" "rounded"
-    ]
-    [ HE.head_
-        [ HE.meta [ HA.charset "utf-8" ]
-        , HE.meta [ HA.name "viewport", HA.content "width=device-width, initial-scale=1.0" ]
-        , HE.title [ HE.text "Ratcap" ]
-        , themeInitScript
-        , HE.link [ HA.rel "stylesheet", HA.href "/style.css" ]
-        ]
-    , HE.body_
-        [ content
-        , HE.script [ HA.type' "module", HA.src "/app.js" ] []
-        ]
-    ]
-
--- | Served as a static file (src/theme.js) because Flame's renderer HTML-escapes
--- | HE.text payloads, and <script> content is raw text where entities are not
--- | decoded — inlining would turn every `'` into `&#39;` and break the script.
-themeInitScript :: Html Message
-themeInitScript =
-  HE.script [ HA.src "/theme.js" ] []

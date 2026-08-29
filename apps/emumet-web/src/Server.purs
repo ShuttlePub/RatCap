@@ -6,7 +6,7 @@ import App.Message (Message)
 import App.Model (Model, RemoteData(..), pageForMaybeRoute)
 import App.Route (routeCodec)
 import App.View (view)
-import App.View.Layout as Layout
+import ShuttlePub.UI.Layout as UI.Layout
 import Data.Either (hush)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
@@ -30,7 +30,7 @@ renderPage urlPath = do
     appView = view model
     stateEl = mkStateElement model
     withState = injectState stateEl appView
-    fullDoc = Layout.document withState
+    fullDoc = UI.Layout.document "Ratcap" withState
   FRS.render fullDoc
 
 mkStateElement :: Model -> Html Message

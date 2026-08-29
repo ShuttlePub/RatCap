@@ -2,3 +2,7 @@ package:
   name: shuttlepub-ui
   dependencies:
     - prelude
+    - effect
+    - flame
+    - maybe
+    - web-events

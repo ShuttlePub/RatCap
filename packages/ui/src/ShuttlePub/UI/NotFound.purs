@@ -1,15 +1,14 @@
-module App.View.NotFound where
+module ShuttlePub.UI.NotFound where
 
 import Prelude
 
-import App.Message (Message)
-import ShuttlePub.UI.Theme as T
 import Flame (Html)
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
+import ShuttlePub.UI.Theme as T
 
-view :: Html Message
-view =
+notFound :: forall msg. Html msg
+notFound =
   HE.div [ HA.class' "space-y-6 text-center py-20" ]
     [ HE.h1 [ HA.class' ("text-6xl font-bold " <> T.textMuted) ]
         [ HE.text "404" ]
