@@ -1,3 +1,8 @@
+workspace:
+  packageSet:
+    registry: 77.7.0
+  extraPackages: {}
+
 package:
   name: ratcap
   dependencies:

@@ -14,8 +14,11 @@
   },
   "dependencies": {
     "@graphql-tools/schema": "^10.0.38",
+    "@urql/core": "^1.16.2",
     "dataloader": "^2.2.3",
     "graphql": "^16",
-    "graphql-yoga": "^5.21.2"
+    "graphql-ws": "^5.9.1",
+    "graphql-yoga": "^5.21.2",
+    "wonka": "^4.0.14"
   }
 }
