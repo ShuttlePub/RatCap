@@ -9,6 +9,8 @@
       "name": "emumet-web",
       "dependencies": {
         "@graphql-tools/schema": "^10.0.38",
+        "@shuttlepub/design-tokens": "workspace:*",
+        "@shuttlepub/styles": "workspace:*",
         "@urql/core": "^1.16.2",
         "dataloader": "^2.2.3",
         "graphql": "^16",
@@ -37,6 +39,12 @@
     },
     "packages/styles": {
       "name": "@shuttlepub/styles",
+      "dependencies": {
+        "@shuttlepub/design-tokens": "workspace:*",
+      },
+      "devDependencies": {
+        "tailwindcss": "^4.2.1",
+      },
     },
     "packages/ui": {
       "name": "@shuttlepub/ui",

@@ -1,4 +1,10 @@
 {
   "name": "@shuttlepub/styles",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@shuttlepub/design-tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.2.1"
+  }
 }

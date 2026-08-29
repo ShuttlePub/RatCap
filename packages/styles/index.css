@@ -1,0 +1,32 @@
+@import "tailwindcss";
+@import "@shuttlepub/design-tokens/tokens.css";
+
+@theme {
+  --color-bg-primary: var(--theme-bg-primary);
+  --color-bg-secondary: var(--theme-bg-secondary);
+  --color-bg-surface: var(--theme-bg-surface);
+  --color-bg-nav: var(--theme-bg-nav);
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-secondary: var(--theme-text-secondary);
+  --color-text-muted: var(--theme-text-muted);
+  --color-text-heading: var(--theme-text-heading);
+  --color-accent: var(--theme-accent);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-border: var(--theme-border);
+  --color-temp-high: var(--theme-temp-high);
+  --color-temp-low: var(--theme-temp-low);
+  --color-error: var(--theme-error);
+  --radius-theme: var(--theme-radius);
+  --radius-theme-lg: var(--theme-radius-lg);
+  --shadow-theme: var(--theme-shadow);
+}
+
+/* === Active setting highlight === */
+
+[data-color="catppuccin-mocha"] [data-color-option="catppuccin-mocha"],
+[data-color="tokyo-night"] [data-color-option="tokyo-night"],
+[data-shape="rounded"] [data-shape-option="rounded"],
+[data-shape="sharp"] [data-shape-option="sharp"] {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: -2px;
+}

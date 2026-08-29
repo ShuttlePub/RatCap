@@ -161,7 +161,7 @@ async function pkceChallenge(verifier: string): Promise<string> {
 const staticFiles: Record<string, { path: string; contentType: string }> = {
   "/app.js": { path: "dist/app.js", contentType: "application/javascript" },
   "/style.css": { path: "dist/style.css", contentType: "text/css" },
-  "/theme.js": { path: "src/theme.js", contentType: "application/javascript" },
+  "/theme.js": { path: "node_modules/@shuttlepub/design-tokens/theme.js", contentType: "application/javascript" },
 };
 
 function serveStatic(pathname: string): Response | null {
