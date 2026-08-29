@@ -2,7 +2,7 @@
   "workspace": {
     "packages": {
       "ratcap": {
-        "path": "./",
+        "path": "apps/emumet-web",
         "core": {
           "dependencies": [
             "aff",

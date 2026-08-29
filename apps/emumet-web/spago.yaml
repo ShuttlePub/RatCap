@@ -1,0 +1,31 @@
+package:
+  name: ratcap
+  dependencies:
+    - aff
+    - affjax
+    - affjax-web
+    - argonaut-codecs
+    - argonaut-core
+    - argonaut-generic
+    - arrays
+    - bifunctors
+    - console
+    - effect
+    - either
+    - flame
+    - foldable-traversable
+    - foreign
+    - foreign-object
+    - graphql-client
+    - http-methods
+    - maybe
+    - parallel
+    - prelude
+    - routing
+    - routing-duplex
+    - strings
+    - tuples
+    - web-events
+  test:
+    main: Test.Main
+    dependencies: []

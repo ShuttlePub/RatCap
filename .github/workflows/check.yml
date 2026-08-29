@@ -32,12 +32,17 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - run: purs-tidy check src/ test/
+        working-directory: apps/emumet-web
 
       - run: bunx spago build
+        working-directory: apps/emumet-web
 
       - run: bunx spago test
+        working-directory: apps/emumet-web
 
       - run: >-
           mkdir -p dist && printf 'export function renderPage(...args: any[]): any;\n' > dist/server.d.ts
+        working-directory: apps/emumet-web
 
       - run: bunx tsc --noEmit
+        working-directory: apps/emumet-web
