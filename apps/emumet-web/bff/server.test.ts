@@ -13,7 +13,7 @@ import {
   encodeMockCookie,
   type AppSession,
   type SessionAdapterConfig,
-} from "./session.ts";
+} from "@shuttlepub/auth-bun";
 import { createMockEmumetClient } from "./emumet/mock.ts";
 import { jsonResponse, stubFetch } from "./test-utils.ts";
 

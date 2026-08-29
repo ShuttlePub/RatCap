@@ -10,7 +10,7 @@ import { resolvers } from "./resolvers.ts";
 import { buildContext, type GraphQLContext } from "./context.ts";
 import { createMockEmumetClient } from "./emumet/mock.ts";
 import { EmumetApiError, type EmumetClient } from "./emumet/client.ts";
-import type { SessionAdapter } from "./session.ts";
+import type { SessionAdapter } from "@shuttlepub/auth-bun";
 
 const schema: GraphQLSchema = makeSchema(resolvers);
 

@@ -9,6 +9,8 @@
       "name": "emumet-web",
       "dependencies": {
         "@graphql-tools/schema": "^10.0.38",
+        "@shuttlepub/auth-bun": "workspace:*",
+        "@shuttlepub/auth-core": "workspace:*",
         "@shuttlepub/design-tokens": "workspace:*",
         "@shuttlepub/styles": "workspace:*",
         "@urql/core": "^1.16.2",
@@ -30,9 +32,18 @@
     },
     "packages/auth-bun": {
       "name": "@shuttlepub/auth-bun",
+      "dependencies": {
+        "@shuttlepub/auth-core": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
     },
     "packages/auth-core": {
       "name": "@shuttlepub/auth-core",
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
     },
     "packages/design-tokens": {
       "name": "@shuttlepub/design-tokens",

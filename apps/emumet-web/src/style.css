@@ -1,3 +1,6 @@
 @import "@shuttlepub/styles";
 @source "./**/*.purs";
 @source "../../../packages/ui/src/**/*.purs";
+@source "../../../packages/auth-core/src/**/*.ts";
+@source "../../../packages/auth-bun/src/**/*.ts";
+@source "../../../packages/auth-bun/*.test.ts";

@@ -8,7 +8,7 @@ import {
   createSessionAdapter,
   type AppSession,
   type SessionAdapterConfig,
-} from "./session.ts";
+} from "./src/index.ts";
 import { jsonResponse, stubFetch } from "./test-utils.ts";
 
 // 固定鍵 (32 バイト "0..f" の base64) — テスト間で seal/unseal が往復できることだけが要件

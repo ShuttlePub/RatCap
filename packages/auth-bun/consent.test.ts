@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createConsentHandler } from "./consent.ts";
+import { createConsentHandler } from "./src/index.ts";
 import { jsonResponse, stubFetch } from "./test-utils.ts";
 
 const config = {

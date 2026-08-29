@@ -13,7 +13,7 @@ import { createYoga } from "graphql-yoga";
 import { makeSchema } from "./schema.ts";
 import { resolvers } from "./resolvers.ts";
 import { buildContext, type ContextDeps, type GraphQLContext } from "./context.ts";
-import type { SessionAdapter } from "./session.ts";
+import type { SessionAdapter } from "@shuttlepub/auth-bun";
 import type { EmumetClient } from "./emumet/client.ts";
 
 // request → context → onResponse 間の受け渡しキャリア。

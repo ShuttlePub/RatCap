@@ -3,7 +3,7 @@
 // アダプタと EmumetClient ファクトリは index.ts から DI される。
 // ============================================================
 
-import type { SessionAdapter } from "./session.ts";
+import type { SessionAdapter } from "@shuttlepub/auth-bun";
 import type { EmumetClient } from "./emumet/client.ts";
 import { emptyLoaders, makeLoaders as createLoaders, type Loaders } from "./loaders.ts";
 

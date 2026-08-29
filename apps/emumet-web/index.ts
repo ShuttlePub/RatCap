@@ -1,28 +1,35 @@
 import { renderPage } from "./dist/server.js";
 import {
-  sealCookie,
-  unsealCookie,
-  base64UrlEncode,
   base64UrlDecode,
-  getCookieValue,
-  setCookieHeader,
+  base64UrlEncode,
   clearCookieHeader,
-  getMockSession,
-  getRealSession,
-  setRealSessionCookie,
-  refreshAccessToken,
-  isSessionExpiringSoon,
-  encodeMockCookie,
-  createSessionAdapter,
+  CookieJar,
+  createConsentHandler,
   createMockSessionAdapter,
+  createSessionAdapter,
+  csrfCheck,
+  encodeMockCookie,
+  getCookieValue,
+  getMockSession,
+  getOAuthState,
+  getRealSession,
+  isSessionExpiringSoon,
+  pkceChallenge,
+  randomBase64Url,
+  refreshAccessToken,
+  safeReturnTo,
+  sealCookie,
+  setCookieHeader,
+  setOAuthCookie,
+  setRealSessionCookie,
+  unsealCookie,
   type AppSession,
   type MockSession,
-} from "./bff/session.ts";
+  type SessionAdapter,
+} from "@shuttlepub/auth-bun";
 import { createYogaHandler } from "./bff/server.ts";
-import { createConsentHandler } from "./bff/consent.ts";
 import { createMockEmumetClient } from "./bff/emumet/mock.ts";
 import { createRealEmumetClient } from "./bff/emumet/real.ts";
-import type { SessionAdapter } from "./bff/session.ts";
 
 // ============================================================
 // Configuration
@@ -59,99 +66,11 @@ const IS_SECURE_ORIGIN = APP_ORIGIN.startsWith("https://");
 // Cookie helpers (mock: base64 JSON, real: AES-GCM)
 // ============================================================
 
-type PendingOAuth = {
-  v: 1;
-  state: string;
-  codeVerifier: string;
-  returnTo: string;
-  expiresAt: number; // Unix timestamp
-};
-
-/** Validate return_to as a safe relative path (no open redirect) */
-function safeReturnTo(input: string | null): string {
-  const raw = input || "/";
-  // Must start with "/" and must NOT start with "//" or "/\" (protocol-relative or backslash tricks)
-  if (/^\/(?![/\\])/.test(raw)) return raw;
-  return "/";
-}
-
-// --- Mock mode session helpers ---
 function setMockSessionCookie(headers: Headers, data: MockSession): void {
   headers.append("Set-Cookie", setCookieHeader(SESSION_COOKIE_NAME, encodeMockCookie(data)));
 }
 function clearMockSessionCookie(headers: Headers): void {
   headers.append("Set-Cookie", clearCookieHeader(SESSION_COOKIE_NAME));
-}
-
-// --- Real mode session helpers ---
-async function setOAuthCookie(headers: Headers, data: PendingOAuth): Promise<void> {
-  const sealed = await sealCookie(data);
-  headers.append("Set-Cookie", setCookieHeader(OAUTH_COOKIE_NAME, sealed, { maxAge: OAUTH_STATE_TTL_SECONDS }));
-}
-async function getOAuthState(req: Request): Promise<PendingOAuth | null> {
-  const value = getCookieValue(req, OAUTH_COOKIE_NAME);
-  if (!value) return null;
-  return unsealCookie<PendingOAuth>(value);
-}
-
-// ============================================================
-// CookieJar — for proxying multi-step Kratos flows
-// ============================================================
-
-class CookieJar {
-  private jar = new Map<string, string>();
-  private setCookieHeaders: string[] = [];
-
-  /** Ingest Set-Cookie headers from an upstream response */
-  ingest(response: Response): void {
-    for (const setCookie of response.headers.getSetCookie()) {
-      this.setCookieHeaders.push(setCookie);
-      // Parse cookie name=value for jar
-      const match = setCookie.match(/^([^=]+)=([^;]*)/);
-      if (match) this.jar.set(match[1]!, match[2]!);
-    }
-  }
-
-  /** Build Cookie header string from jar for upstream requests */
-  toCookieHeader(): string {
-    return [...this.jar.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
-  }
-
-  /** Add only Kratos-relevant browser cookies (filter out app cookies to avoid leaking secrets) */
-  mergeBrowserCookies(req: Request): void {
-    const browserCookies = req.headers.get("cookie");
-    if (!browserCookies) return;
-    for (const part of browserCookies.split(";")) {
-      const [name, ...rest] = part.trim().split("=");
-      if (name && !this.jar.has(name) && name.startsWith("ory_kratos")) {
-        this.jar.set(name, rest.join("="));
-      }
-    }
-  }
-
-  /** Append only Kratos-related Set-Cookie headers to the downstream response (filter out non-Kratos cookies) */
-  applyToResponse(headers: Headers): void {
-    for (const sc of this.setCookieHeaders) {
-      // Only forward cookies that start with ory_kratos
-      const match = sc.match(/^([^=]+)=/);
-      if (match && match[1]!.startsWith("ory_kratos")) {
-        headers.append("Set-Cookie", sc);
-      }
-    }
-  }
-}
-
-// ============================================================
-// PKCE helpers
-// ============================================================
-
-function randomBase64Url(bytes: number): string {
-  return base64UrlEncode(crypto.getRandomValues(new Uint8Array(bytes)));
-}
-
-async function pkceChallenge(verifier: string): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  return base64UrlEncode(new Uint8Array(hash));
 }
 
 // ============================================================
@@ -234,33 +153,6 @@ async function handleMockAuth(req: Request, pathname: string): Promise<Response 
   }
 
   return null;
-}
-
-// ============================================================
-// CSRF protection — Origin/Referer check for state-changing requests
-// ============================================================
-
-function csrfCheck(req: Request): Response | null {
-  const origin = req.headers.get("origin");
-  const referer = req.headers.get("referer");
-  const expected = new URL(APP_ORIGIN).origin;
-
-  if (origin) {
-    if (origin !== expected) {
-      return Response.json({ error: "CSRF check failed: origin mismatch" }, { status: 403 });
-    }
-    return null; // Origin header present and matches
-  }
-  if (referer) {
-    try {
-      if (new URL(referer).origin !== expected) {
-        return Response.json({ error: "CSRF check failed: referer mismatch" }, { status: 403 });
-      }
-      return null;
-    } catch { /* malformed referer */ }
-  }
-  // No Origin or Referer — reject (strict)
-  return Response.json({ error: "CSRF check failed: missing origin" }, { status: 403 });
 }
 
 // ============================================================
@@ -378,8 +270,8 @@ async function handleRealAuth(req: Request, pathname: string): Promise<Response 
     const codeChallenge = await pkceChallenge(codeVerifier);
 
     // Store PKCE state in encrypted cookie
-    const pendingOAuth: PendingOAuth = {
-      v: 1,
+    const pendingOAuth = {
+      v: 1 as const,
       state,
       codeVerifier,
       returnTo,
@@ -655,7 +547,7 @@ if (!USE_MOCK) {
 // Mock: base64 MockSession を解決 + プロセス共有の MockEmumetClient (token 無視)。
 // Real: AES-GCM AppSession + Hydra refresh + token から RealEmumetClient を生成。
 const sessionAdapter: SessionAdapter<{ accessToken: string }> = USE_MOCK
-  ? createMockSessionAdapter()
+  ? createMockSessionAdapter(SESSION_COOKIE_NAME, IS_SECURE_ORIGIN)
   : createSessionAdapter({
       cookieSecretBase64: COOKIE_SECRET_BASE64!,
       sessionCookieName: SESSION_COOKIE_NAME,
