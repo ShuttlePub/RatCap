@@ -40,6 +40,12 @@ jobs:
       - run: bunx spago test
         working-directory: apps/emumet-web
 
+      - run: bun test
+        working-directory: apps/emumet-web
+
+      - run: bun test
+        working-directory: packages/auth-bun
+
       - run: >-
           mkdir -p dist && printf 'export function renderPage(...args: any[]): any;\n' > dist/server.d.ts
         working-directory: apps/emumet-web
