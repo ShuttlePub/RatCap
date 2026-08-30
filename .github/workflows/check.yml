@@ -52,3 +52,22 @@ jobs:
 
       - run: bunx tsc --noEmit
         working-directory: apps/emumet-web
+
+      - run: purs-tidy check apps/booskiff-web/src apps/booskiff-web/test
+        working-directory: .
+
+      - run: bunx spago build
+        working-directory: apps/booskiff-web
+
+      - run: bunx spago test
+        working-directory: apps/booskiff-web
+
+      - run: bun test bff/
+        working-directory: apps/booskiff-web
+
+      - run: >-
+          mkdir -p dist && printf 'export function renderPage(...args: any[]): any;\n' > dist/server.d.ts
+        working-directory: apps/booskiff-web
+
+      - run: bunx tsc --noEmit
+        working-directory: apps/booskiff-web

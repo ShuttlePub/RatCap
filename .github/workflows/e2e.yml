@@ -1,0 +1,59 @@
+name: drive-web-e2e
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/booskiff-web/**
+      - .github/workflows/e2e.yml
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      BOOSKIFF_READ_TOKEN: ${{ secrets.BOOSKIFF_READ_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Skip when Booskiff checkout token is unavailable
+        if: env.BOOSKIFF_READ_TOKEN == ''
+        run: >-
+          echo "SKIPPED: BOOSKIFF_READ_TOKEN not configured; run scripts/e2e.sh locally"
+
+      - name: Checkout Booskiff core
+        if: env.BOOSKIFF_READ_TOKEN != ''
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: ShuttlePub/Booskiff
+          path: Booskiff-checkout
+          token: ${{ secrets.BOOSKIFF_READ_TOKEN }}
+          persist-credentials: false
+
+      - if: env.BOOSKIFF_READ_TOKEN != ''
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Install Playwright Chromium
+        if: env.BOOSKIFF_READ_TOKEN != ''
+        run: bunx playwright install --with-deps chromium
+        working-directory: apps/booskiff-web
+
+      - name: Run E2E suite
+        if: env.BOOSKIFF_READ_TOKEN != ''
+        run: BOOSKIFF_CORE_DIR="$GITHUB_WORKSPACE/Booskiff-checkout" ./scripts/e2e.sh
+        working-directory: apps/booskiff-web
+
+      - name: Upload Playwright report
+        if: failure() && env.BOOSKIFF_READ_TOKEN != ''
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: booskiff-web-playwright-report
+          path: apps/booskiff-web/e2e/playwright-report/
+          if-no-files-found: ignore
