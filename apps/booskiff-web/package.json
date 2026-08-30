@@ -1,0 +1,21 @@
+{
+  "name": "booskiff-web",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@shuttlepub/auth-bun": "workspace:*",
+    "@shuttlepub/auth-core": "workspace:*",
+    "@shuttlepub/design-tokens": "workspace:*",
+    "@shuttlepub/styles": "workspace:*"
+  },
+  "devDependencies": {
+    "spago": "^1.0.3",
+    "typescript": "^5",
+    "@types/bun": "latest",
+    "@tailwindcss/cli": "^4.2.1",
+    "tailwindcss": "^4.2.1",
+    "@playwright/test": "^1.55.0",
+    "purescript": "^0.15.15"
+  }
+}
