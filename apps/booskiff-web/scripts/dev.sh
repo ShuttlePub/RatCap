@@ -80,6 +80,12 @@ COOKIE_SECRET_FOR_BUN=""
 case "$MODE" in
   mock)
     export USE_MOCK=true
+    # Mock login signs a real RS256 JWT and fails with 500 without key material;
+    # fall back to the committed test-only fixture so the quickstart works with
+    # zero setup. Explicit env values always win.
+    if [[ -z "${TEST_JWT_PRIVATE_KEY_PEM_BASE64:-}" ]]; then
+      export TEST_JWT_PRIVATE_KEY_PEM_BASE64="$(base64 -w0 e2e/fixtures/jwtRS256.pkcs8.pem)"
+    fi
     ;;
 
   dev)

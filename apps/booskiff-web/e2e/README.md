@@ -35,9 +35,8 @@ The script:
 | Service  | Image / build                              | Notes                                       |
 | -------- | ------------------------------------------ | ------------------------------------------- |
 | postgres | postgres:16                                | no host ports                               |
-| minio    | minio/minio:latest                         | `127.0.0.1:19000 -> 9000` (browser-reachable presigned URLs) |
-| mc-init  | minio/mc                                   | one-shot bucket bootstrap, exits 0          |
-| core     | built from `$BOOSKIFF_CORE_DIR`            | no host ports; `/readyz` healthcheck        |
+| minio    | minio/minio:latest                         | `127.0.0.1:19000 -> 19000` (browser-reachable presigned URLs); core shares this netns (`network_mode: service:minio`) so SigV4 presign host matches |
+| core     | built from `$BOOSKIFF_CORE_DIR`            | in-network API on the minio alias (`http://minio:8080`); self-creates the bucket at startup, so there is no mc-init service |
 | web      | built from `apps/booskiff-web/Containerfile` | `127.0.0.1:3210 -> 3100`                 |
 
 Host-port hygiene: the drive-foundation dev stack owns 5432 and 9000-9001, so
@@ -46,7 +45,8 @@ this project publishes only 3210 and 19000, both loopback-only.
 ## Fixtures (`e2e/fixtures/`)
 
 TEST-ONLY, committed (mirroring Booskiff core's committed test keys):
-`jwtRS256.pkcs8.pem` + `jwks.json` (`kid: e2e-booskiff-web`). Regenerate and
+`jwtRS256.pkcs8.pem` + `jwks.json` (`kid: test-key`, matching the BFF signing
+key id). Regenerate and
 verify with the exact commands in `e2e/fixtures/README.md`; `bun
 e2e/fixtures/verify.ts` must print `OK`.
 
