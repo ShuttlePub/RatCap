@@ -1,0 +1,98 @@
+# Multi-stage build for booskiff-web (PureScript + Flame SSR bundle + Bun BFF).
+#
+# Build context MUST be the repo root (bun workspace monorepo):
+#   docker build -f apps/booskiff-web/Containerfile .
+#
+# The e2e compose file wires this up with context: ../../.. (repo root).
+# Auth fixture keys are NOT baked in: they are injected at runtime via env
+# (TEST_JWT_PRIVATE_KEY_PEM_BASE64 / TEST_JWT_JWKS_JSON) from e2e/fixtures,
+# see scripts/e2e.sh and e2e/compose.e2e.yml.
+
+# --- builder ---------------------------------------------------------------
+FROM oven/bun:1 AS builder
+
+WORKDIR /repo
+
+# Workspace manifests first for a cached, deterministic install.
+# emumet-web is a workspace member referenced by bun.lock, so its manifest (and
+# ONLY its manifest — never its sources) is copied to keep `bun install
+# --frozen-lockfile` consistent without pulling emumet-web into the image.
+COPY package.json bun.lock ./
+COPY apps/booskiff-web/package.json ./apps/booskiff-web/package.json
+COPY apps/emumet-web/package.json ./apps/emumet-web/package.json
+COPY packages ./packages
+# Host node_modules inside packages/ hold symlinks into the host tree; drop
+# them so `bun install --frozen-lockfile` rebuilds clean links in-image.
+RUN rm -rf packages/*/node_modules
+COPY apps/booskiff-web/spago.yaml apps/booskiff-web/spago.lock ./apps/booskiff-web/
+COPY apps/booskiff-web/src ./apps/booskiff-web/src
+COPY apps/booskiff-web/index.ts ./apps/booskiff-web/index.ts
+COPY apps/booskiff-web/bff ./apps/booskiff-web/bff
+
+# spago's CLI unconditionally probes `node --version` (>= 13) and
+# `git --version` before any command, and oven/bun:1 ships neither — the
+# failed spawn crashes spago instead of erroring cleanly. bookworm's nodejs
+# (18) satisfies the requirement.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends nodejs git \
+  && rm -rf /var/lib/apt/lists/*
+
+# Toolchain binaries spago shells out to, fetched from pinned upstream
+# tarballs via ADD (buildkit's own HTTP transfer with timeouts/retries —
+# bun fetch inside the build network stalled mid-body on these). Not the
+# `purescript` npm postinstall: inside docker builds its GitHub download +
+# `purs --version` check is unreliable and it falls back to a Haskell
+# `stack` build, which is not available here. Versions mirror the nix dev
+# shell (purs 0.15.16, esbuild 0.27.2); esbuild ships binaries on npm only
+# (its GitHub releases are asset-less).
+ADD https://github.com/purescript/purescript/releases/download/v0.15.16/linux64.tar.gz /tmp/purs.tar.gz
+ADD https://registry.npmjs.org/@esbuild/linux-x64/-/linux-x64-0.27.2.tgz /tmp/esbuild.tgz
+RUN tar -xzf /tmp/purs.tar.gz -C /usr/local/bin --strip-components=1 purescript/purs \
+  && tar -xzf /tmp/esbuild.tgz -C /usr/local/bin --strip-components=2 package/bin/esbuild \
+  && chmod +x /usr/local/bin/purs /usr/local/bin/esbuild \
+  && rm /tmp/purs.tar.gz /tmp/esbuild.tgz \
+  && purs --version && esbuild --version
+
+# --ignore-scripts skips the `purescript` postinstall (superseded by the
+# tarball above); no other dependency in this tree ships an install script.
+RUN bun install --frozen-lockfile --ignore-scripts
+
+# With the postinstall skipped, node_modules/.bin/purs points at the
+# `purescript` package's placeholder binary and would shadow the real one
+# (PATH below puts node_modules/.bin first) with an ENOEXEC error. Drop it.
+RUN rm -f /repo/apps/booskiff-web/node_modules/.bin/purs
+
+# spago / tailwind CLI live in node_modules/.bin; spago shells out to `purs`
+# (now at /usr/local/bin), so both must be on PATH before any spago command.
+ENV PATH="/repo/apps/booskiff-web/node_modules/.bin:/repo/node_modules/.bin:${PATH}"
+
+WORKDIR /repo/apps/booskiff-web
+# Invoke spago's launcher via `bun <file>` instead of `bunx spago`: bunx
+# parses the launcher's `#!/usr/bin/env -S node --no-warnings=...` shebang
+# as bun CLI flags and errors out (bun's --no-warnings takes no value).
+RUN bun node_modules/spago/bin/bundle.js bundle --platform browser --module Client --outfile dist/app.js \
+  && bun node_modules/spago/bin/bundle.js bundle --platform node --module Server --outfile dist/server.js --bundle-type module \
+  && bunx @tailwindcss/cli -i src/style.css -o dist/style.css
+
+# Drop build-only artifacts so the runtime copy stays lean. dist/ is kept.
+# node_modules intentionally survives: bun installed every dependency into
+# this app-level workspace dir (root /repo/node_modules is empty), so runtime
+# imports — including @shuttlepub/* symlinks into ../../packages — only
+# resolve if the directory is copied through.
+RUN rm -rf output .spago .cache
+
+# --- runtime ---------------------------------------------------------------
+FROM oven/bun:1-slim AS runtime
+
+WORKDIR /repo
+COPY --from=builder /repo/node_modules ./node_modules
+COPY --from=builder /repo/packages ./packages
+COPY --from=builder /repo/apps/booskiff-web ./apps/booskiff-web
+
+ENV PORT=3100
+EXPOSE 3100
+
+# index.ts resolves dist/ relative to import.meta.dir, so the working
+# directory only needs to contain the app entrypoint.
+WORKDIR /repo/apps/booskiff-web
+CMD ["bun", "index.ts"]

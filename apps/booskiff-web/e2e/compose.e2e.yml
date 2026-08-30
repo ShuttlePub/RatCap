@@ -1,0 +1,150 @@
+# E2E stack for booskiff-web: Postgres + MinIO + Booskiff core + booskiff-web BFF.
+#
+# Isolated from other local stacks via the project name (own network/volumes)
+# and host-port hygiene: the drive-foundation dev stack owns 5432/9000-9001,
+# so ONLY these bindings are published:
+#   web   127.0.0.1:3210 -> 3100
+#   minio 127.0.0.1:19000 -> 9000
+#
+# The core image is built from a separate Booskiff checkout; its absolute path
+# must be provided via BOOSKIFF_CORE_DIR (scripts/e2e.sh does this and fails
+# with a clear message otherwise).
+#
+# Runtime JWT fixture env for the web service comes from e2e/.env.e2e.runtime
+# (gitignored, generated from e2e/fixtures by scripts/e2e.sh) because compose
+# cannot base64-encode the PEM itself.
+name: booskiff-web-e2e
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: booskiff
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: booskiff
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booskiff -d booskiff"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
+  minio:
+    image: minio/minio:latest
+    # Listens on :19000 so the published loopback port, the in-network loopback
+    # below, and the presigned host all match — SigV4 signs the `host` header,
+    # so any host:port divergence between signing and serving 403s.
+    command: server /data --address ":19000"
+    environment:
+      MINIO_ROOT_USER: booskiff
+      MINIO_ROOT_PASSWORD: booskiff-secret
+    ports:
+      - "127.0.0.1:19000:19000"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19000/minio/health/live"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
+  # No bucket-bootstrap one-shot service: core self-creates the bucket on
+  # startup (storage.ensure_bucket in core/src/main.rs), and a container
+  # that exits (even with 0) makes `compose up --wait` abort the whole
+  # stack before web turns healthy.
+
+  core:
+    build:
+      context: ${BOOSKIFF_CORE_DIR}
+      dockerfile: deploy/self-hosting/Containerfile
+    # Shares minio's network namespace: core reaches S3 on the loopback
+    # 127.0.0.1:19000 binding, so BOOSKIFF_S3_ENDPOINT _is_ the public endpoint
+    # and core's presign rewriting becomes a no-op (rewriting after signing
+    # would break SigV4, which covers the host header). Core's API is then
+    # reachable in-network under the minio alias: http://minio:8080.
+    network_mode: "service:minio"
+    environment:
+      # Env var names verified against Booskiff core's
+      # deploy/self-hosting/compose.yml and core/src/config.rs.
+      BOOSKIFF_DATABASE_URL: postgres://booskiff:changeme@postgres:5432/booskiff
+      BOOSKIFF_LISTEN_ADDR: 0.0.0.0:8080
+      BOOSKIFF_S3_ENDPOINT: http://127.0.0.1:19000
+      # Identical to BOOSKIFF_S3_ENDPOINT by construction (see network_mode).
+      BOOSKIFF_S3_ENDPOINT_PUBLIC: http://127.0.0.1:19000
+      BOOSKIFF_S3_REGION: us-east-1
+      BOOSKIFF_S3_BUCKET: booskiff-e2e
+      BOOSKIFF_S3_ACCESS_KEY: booskiff
+      BOOSKIFF_S3_SECRET_KEY: booskiff-secret
+      # Format `iss|jwks_url` per core config.rs parse_trusted_issuers.
+      BOOSKIFF_JWT_TRUSTED_ISSUERS: "http://web:3100|http://web:3100/.well-known/jwks.json"
+      # Empty = audience not enforced.
+      BOOSKIFF_JWT_AUDIENCE: ""
+      BOOSKIFF_JWT_OWNER_TYPE_CLAIM: owner_type
+      BOOSKIFF_PREMIUM_MODE: mirror
+      BOOSKIFF_PAYMENT_PROVIDER: disabled
+      BOOSKIFF_PLAN_DEFAULT_STORAGE_QUOTA_BYTES: "1073741824"
+      BOOSKIFF_PLAN_DEFAULT_MAX_FILE_BYTES: "104857600"
+      # Raised from the 100rpm default so tests never trip the limiter.
+      BOOSKIFF_PLAN_DEFAULT_RATE_LIMIT_RPM: "1000"
+      BOOSKIFF_PRESIGNED_GET_TTL_SECS: "900"
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      # curl is present in the core image (same check as core's own compose).
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/readyz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: "no"
+
+  web:
+    build:
+      # Repo root (this file lives at apps/booskiff-web/e2e/).
+      context: ../../..
+      dockerfile: apps/booskiff-web/Containerfile
+    ports:
+      - "127.0.0.1:3210:3100"
+    env_file:
+      - .env.e2e.runtime
+    environment:
+      PORT: "3100"
+      APP_ORIGIN: http://127.0.0.1:3210
+      # Core shares minio's netns (service:minio), so it answers on this alias.
+      CORE_API_URL: http://minio:8080
+      USE_MOCK: "true"
+      USE_TEST_JWT: "true"
+      TEST_JWT_ISSUER: http://web:3100
+      SESSION_COOKIE_NAME: booskiff_session
+      OAUTH_COOKIE_NAME: booskiff_oauth
+      # Fixed TEST-ONLY value (base64 of 32 bytes); fixtures are test keys.
+      COOKIE_SECRET_BASE64: eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHg=
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      # oven/bun:1-slim ships neither curl nor wget; use the bun runtime that
+      # IS in the image instead of apt-installing a downloader.
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:3100/login').then(r => process.exit(r.status === 200 ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+
+volumes:
+  pgdata:
+  miniodata:
