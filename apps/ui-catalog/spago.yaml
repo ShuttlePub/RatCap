@@ -1,0 +1,32 @@
+workspace:
+  packageSet:
+    registry: 77.7.0
+  extraPackages:
+    shuttlepub-ui:
+      path: ../../packages/ui
+
+package:
+  name: ui-catalog
+  dependencies:
+    - shuttlepub-ui
+    - aff
+    - argonaut-codecs
+    - argonaut-core
+    - argonaut-generic
+    - arrays
+    - console
+    - effect
+    - either
+    - exceptions
+    - flame
+    - foldable-traversable
+    - foreign
+    - maybe
+    - prelude
+    - routing
+    - routing-duplex
+    - tuples
+    - web-dom
+  test:
+    main: Test.Main
+    dependencies: []

@@ -6,6 +6,7 @@ ShuttlePub のフロントエンドを管理する Bun Workspaces モノレポ�
 
 - `apps/emumet-web/`: Emumet Web フロントエンド (PureScript + Flame SSR / Bun BFF)
 - `apps/booskiff-web/`: Booskiff Drive Web フロントエンド (PureScript + Flame SSR / Bun BFF)
+- `apps/ui-catalog/`: 共有 UI / デザイントークンのカタログ (PureScript + Flame SSR / Bun サーバー)
 - `packages/design-tokens/`: 共有デザイントークン
 - `packages/styles/`: 共有スタイル
 - `packages/ui/`: 共有 UI
