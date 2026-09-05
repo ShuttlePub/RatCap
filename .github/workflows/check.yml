@@ -71,3 +71,22 @@ jobs:
 
       - run: bunx tsc --noEmit
         working-directory: apps/booskiff-web
+
+      - run: purs-tidy check apps/ui-catalog/src apps/ui-catalog/test
+        working-directory: .
+
+      - run: bunx spago build
+        working-directory: apps/ui-catalog
+
+      - run: bunx spago test
+        working-directory: apps/ui-catalog
+
+      - run: bun test
+        working-directory: apps/ui-catalog
+
+      - run: >-
+          mkdir -p dist && printf 'export function renderPage(...args: any[]): any;\n' > dist/server.d.ts
+        working-directory: apps/ui-catalog
+
+      - run: bunx tsc --noEmit
+        working-directory: apps/ui-catalog
